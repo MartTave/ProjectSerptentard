@@ -53,3 +53,18 @@ void printBeginAndEnd(int nValues, float *values, int totalSize)
         printf("idx[%i] -> %f\n", idx, values[idx]);
     }
 }
+
+
+void convertIdx(int gridDimX,int blockDimX,  int blockDimY, int blockIdxX, int blockIdxY, int threadIdxX, int threadIdxY, long *pos)
+{
+    long UniqueBlockIndex = blockIdxY * gridDimX + blockIdxX;
+    long UniqueThreadIndex = UniqueBlockIndex * blockDimY * blockDimX + threadIdxY *
+    blockDimX + threadIdxX;
+    *pos = UniqueThreadIndex;
+}
+
+void get2DPos(int nx, int ny, int idx, int *i, int *j)
+{
+    *j=(idx+1)%nx;
+    *i=idx+1-*j*nx;
+}
