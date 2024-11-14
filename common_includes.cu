@@ -3,8 +3,6 @@
  */
 #include <stdio.h>
 
-#define N_THREADS 512
-
 #define CHECK_ERROR(call)                                                                 \
     {                                                                                     \
         cudaError_t err = call;                                                           \

@@ -12,7 +12,7 @@
 #include "solve/solve.cuh"
 #include "write/write.h"
 
-#include "common_includes.c"
+#include "common_includes.cu"
 
 // Namespace
 using namespace std;
@@ -78,22 +78,15 @@ int main(int argc, char *argv[])
 
     Initialization(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy); // Initialize the distance function field
 
-    int numBlocks = ceil((nx * ny) / N_THREADS);    
-    InitializationKernel<<<numBlocks, N_THREADS>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
+    int numBlocks = ceil((nx * ny) / N_THREADS);
+    dim3 N_THREADS(32, 32);
+    dim3 N_BLOCKS(ceil(nx / 32.0), ceil(ny / 32));
+    InitializationKernel<<<N_BLOCKS, N_THREADS>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
 
     // TODO: computeInterfaceSignature ?
-
-    computeBoundaries(phi, nx, ny);                             // Extrapolate phi on the boundaries
+    computeBoundariesLines<<<N_BLOCKS, N_THREADS>>>(d_phi, nx, ny);
+    computeBoundariesColumns<<<N_BLOCKS, N_THREADS>>>(d_phi, nx, ny);
     cudaDeviceSynchronize();
-    computeBoundariesLines<<<>>>(d_phi, nx, ny);
-    computeBoundariesColumns<<<>>>(d_phi, nx, ny);
-    cudaDeviceSyncronize();
-
-    cudaMemcpy(d_phi, h_phi, nx * ny, cudaMemcpyDeviceToHost);
-
-    printBeginAndEnd(5, h_phi, nx * ny);
-
-    return 0;
 
     // == Output ==
     stringstream ss;
