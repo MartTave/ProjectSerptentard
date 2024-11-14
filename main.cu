@@ -7,6 +7,7 @@
 
 // == User lib ==
 #include "diagnostics/diagnostics.h"
+#include "initialization/init.cuh"
 #include "initialization/init.h"
 #include "solve/solve.h"
 #include "write/write.h"
@@ -41,19 +42,33 @@ int main(int argc, char *argv[])
     int nSteps = int(tFinal / dt); // Number of steps to perform
     double time = 0.0;             // Actual Simulation time [s]
 
+
+    double** phi = new double*[nx]; // LevelSet field
+    double** curvature = new double*[nx]; // Curvature field
+    double** u = new double*[nx]; // Velocity field in x-direction
+    double** v = new double*[nx]; // Velocity field in y-direction
+    for (int i = 0; i < nx; ++i) {
+        phi[i] = new double[ny];
+        curvature[i] = new double[ny];
+        u[i] = new double[ny];
+        v[i] = new double[ny];
+    }
+
+
+
     // == Numerical ==
     int outputFrequency = nSteps / 40;
 
-    float *h_phi;
-    float *h_curvature;
-    float *h_u;
-    float *h_v;
+    double *h_phi;
+    double *h_curvature;
+    double *h_u;
+    double *h_v;
 
-    float *d_phi;
-    float *d_phi_n;
-    float *d_curvature;
-    float *d_u;
-    float *d_v;
+    double *d_phi;
+    double *d_phi_n;
+    double *d_curvature;
+    double *d_u;
+    double *d_v;
 
     CHECK_ERROR(cudaMalloc((void **)&d_phi, nx * ny));
     CHECK_ERROR(cudaMalloc((void **)&d_phi_n, nx * ny));
@@ -62,8 +77,14 @@ int main(int argc, char *argv[])
     CHECK_ERROR(cudaMalloc((void **)&d_v, nx * ny));
 
     Initialization(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy); // Initialize the distance function field
-    computeBoundaries(d_phi, nx, ny);                             // Extrapolate phi on the boundaries
-    cudaDeviceSyncronize();
+
+    int numBlocks = ceil((nx * ny) / N_THREADS);    
+    InitializationKernel<<<numBlocks, N_THREADS>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
+
+    // TODO: computeInterfaceSignature ?
+
+    computeBoundaries(phi, nx, ny);                             // Extrapolate phi on the boundaries
+    cudaDeviceSynchronize();
 
     // == Output ==
     stringstream ss;
@@ -90,7 +111,7 @@ int main(int argc, char *argv[])
         // Solve the advection equation
         solveAdvectionEquationExplicit(phi, u, v, nx, ny, dx, dy, dt);
 
-        cudaDeviceSyncronize();
+        cudaDeviceSynchronize();
 
         // Diagnostics: interface perimeter
         computeInterfaceLength(phi, nx, ny, dx, dy);
@@ -98,7 +119,7 @@ int main(int argc, char *argv[])
         // Diagnostics: interface curvature
         computeInterfaceCurvature(phi, curvature, nx, ny, dx, dy);
 
-        cudaDeviceSyncronize();
+        cudaDeviceSynchronize();
 
         // TODO: Memcopy from device to host (This time, no need to copy u and v)
 
@@ -110,7 +131,7 @@ int main(int argc, char *argv[])
     }
 
     // Free memory
-    delete[] h_phi, h_curvature, h_u, h_v;
+    //delete[] h_phi, h_curvature, h_u, h_v;
 
     CHECK_ERROR(cudaFree((void **)&d_phi));
     CHECK_ERROR(cudaFree((void **)&d_phi_n));
