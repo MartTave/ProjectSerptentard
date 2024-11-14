@@ -117,7 +117,12 @@ int main(int argc, char *argv[])
         cout << "\nStarting iteration step " << step << "/" << nSteps << "\tTime " << time << "s\n";
 
         // Solve the advection equation
-        solveAdvectionEquationExplicit(phi, u, v, nx, ny, dx, dy, dt);
+        solveAdvectionEquationExplicit<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, d_u, d_v, nx, ny, dx, dy, dt);
+
+        cudaDeviceSynchronize();
+
+        computeBoundariesLines<<<1, nx>>>(d_phi, nx, ny);
+        computeBoundariesColumns<<<1, ny>>>(d_phi, nx, ny);
 
         cudaDeviceSynchronize();
 

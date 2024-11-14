@@ -33,3 +33,44 @@ __global__ void computeBoundariesColumns(double *d_phi, const int nx, const int 
         d_phi[lastColIndex] = 2.0 * d_phi[n * nx + nx - 2] - d_phi[n * nx + nx - 3];
     }
 }
+
+__global__ void copyPhi(double *phi, double *phi_n, const int nx, const int ny)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i >= nx || j >= ny)
+    {
+        return;
+    }
+
+    phi_n[i * ny + j] = phi[i * ny + j];
+}
+
+__global__ void solveAdvectionEquationExplicit(double *phi, double *phi_n, double *u, double *v, const int nx, const int ny, const double dx, const double dy, const double dt)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i >= nx || j >= ny)
+    {
+        return;
+    }
+    int l = i * ny + j;
+    if (u[l] > 0.0)
+    {
+        phi[l] -= dt * (u[l] * (phi_n[(i + 1) * ny + j] - phi_n[l]) / dx);
+    }
+    else
+    {
+        phi[l] -= dt * (u[l] * (phi_n[i * ny + j] - phi_n[(i - 1) * ny + j]) / dx);
+    }
+    if (v[l] < 0.0)
+    {
+        phi[l] -= dt * (v[l] * (phi_n[l + 1] - phi_n[l]) / dy);
+    }
+    else
+    {
+        phi[l] -= dt * (v[l] * (phi_n[l] - phi_n[l - 1]) / dy);
+    }
+}
