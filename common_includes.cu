@@ -1,9 +1,9 @@
-#define N_THREADS 512
-
 /**
  * CUDA related includes
  */
 #include <stdio.h>
+
+#define N_THREADS 512
 
 #define CHECK_ERROR(call)                                                                 \
     {                                                                                     \

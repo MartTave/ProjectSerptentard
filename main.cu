@@ -8,7 +8,7 @@
 // == User lib ==
 #include "diagnostics/diagnostics.h"
 #include "initialization/init.h"
-#include "solve/solve.h"
+#include "solve/solve.cuh"
 #include "write/write.h"
 
 #include "common_includes.c"
@@ -44,16 +44,16 @@ int main(int argc, char *argv[])
     // == Numerical ==
     int outputFrequency = nSteps / 40;
 
-    float *h_phi;
-    float *h_curvature;
-    float *h_u;
-    float *h_v;
+    double *h_phi;
+    double *h_curvature;
+    double *h_u;
+    double *h_v;
 
-    float *d_phi;
-    float *d_phi_n;
-    float *d_curvature;
-    float *d_u;
-    float *d_v;
+    double *d_phi;
+    double *d_phi_n;
+    double *d_curvature;
+    double *d_u;
+    double *d_v;
 
     CHECK_ERROR(cudaMalloc((void **)&d_phi, nx * ny));
     CHECK_ERROR(cudaMalloc((void **)&d_phi_n, nx * ny));
@@ -62,8 +62,15 @@ int main(int argc, char *argv[])
     CHECK_ERROR(cudaMalloc((void **)&d_v, nx * ny));
 
     Initialization(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy); // Initialize the distance function field
-    computeBoundaries(d_phi, nx, ny);                             // Extrapolate phi on the boundaries
+    computeBoundariesLines<<<>>>(d_phi, nx, ny);
+    computeBoundariesColumns<<<>>>(d_phi, nx, ny);
     cudaDeviceSyncronize();
+
+    cudaMemcpy(d_phi, h_phi, nx * ny, cudaMemcpyDeviceToHost);
+
+    printBeginAndEnd(5, h_phi, nx * ny);
+
+    return 0;
 
     // == Output ==
     stringstream ss;
