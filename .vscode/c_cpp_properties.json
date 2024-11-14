@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/nix/store/d7vji37yjnbji14m4waa5rn35f10jzya-linux-headers-6.7/include/linux"
+            ],
+            "defines": [],
+            "compilerPath": "/run/current-system/sw/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
