@@ -9,7 +9,7 @@
 #include "diagnostics/diagnostics.h"
 #include "initialization/init.cuh"
 #include "initialization/init.h"
-#include "solve/solve.h"
+#include "solve/solve.cuh"
 #include "write/write.h"
 
 #include "common_includes.c"
@@ -85,6 +85,15 @@ int main(int argc, char *argv[])
 
     computeBoundaries(phi, nx, ny);                             // Extrapolate phi on the boundaries
     cudaDeviceSynchronize();
+    computeBoundariesLines<<<>>>(d_phi, nx, ny);
+    computeBoundariesColumns<<<>>>(d_phi, nx, ny);
+    cudaDeviceSyncronize();
+
+    cudaMemcpy(d_phi, h_phi, nx * ny, cudaMemcpyDeviceToHost);
+
+    printBeginAndEnd(5, h_phi, nx * ny);
+
+    return 0;
 
     // == Output ==
     stringstream ss;
