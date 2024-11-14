@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "solve.cuh"
 
 __global__ void computeBoundariesLines(double *d_phi, const int nx, const int ny)

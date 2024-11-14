@@ -38,7 +38,7 @@ long long timeInMilliseconds(void)
 /**
  * Debug helpers
  */
-void printBeginAndEnd(int nValues, float *values, int totalSize)
+void printBeginAndEnd(int nValues, double *values, int totalSize)
 {
     for (int i = 0; i < nValues; i++)
         printf("idx[%i] -> %f\n", i, values[i]);

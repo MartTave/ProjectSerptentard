@@ -3,12 +3,12 @@
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
+
 #include <cuda.h>
 
 // == User lib ==
 #include "diagnostics/diagnostics.h"
 #include "initialization/init.cuh"
-#include "initialization/init.h"
 #include "solve/solve.cuh"
 #include "write/write.h"
 
@@ -59,10 +59,10 @@ int main(int argc, char *argv[])
     // == Numerical ==
     int outputFrequency = nSteps / 40;
 
-    double *h_phi;
-    double *h_curvature;
-    double *h_u;
-    double *h_v;
+    double *h_phi = new double[nx * ny];
+    double *h_curvature = new double[nx * ny];
+    double *h_u = new double[nx * ny];
+    double *h_v = new double[nx * ny];
 
     double *d_phi;
     double *d_phi_n;
@@ -70,23 +70,29 @@ int main(int argc, char *argv[])
     double *d_u;
     double *d_v;
 
-    CHECK_ERROR(cudaMalloc((void **)&d_phi, nx * ny));
-    CHECK_ERROR(cudaMalloc((void **)&d_phi_n, nx * ny));
-    CHECK_ERROR(cudaMalloc((void **)&d_curvature, nx * ny));
-    CHECK_ERROR(cudaMalloc((void **)&d_u, nx * ny));
-    CHECK_ERROR(cudaMalloc((void **)&d_v, nx * ny));
+    size_t size = nx * ny * sizeof(double);
 
-    Initialization(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy); // Initialize the distance function field
+    CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
+    CHECK_ERROR(cudaMalloc((void **)&d_phi_n, size));
+    CHECK_ERROR(cudaMalloc((void **)&d_curvature, size));
+    CHECK_ERROR(cudaMalloc((void **)&d_u, size));
+    CHECK_ERROR(cudaMalloc((void **)&d_v, size));
 
-    int numBlocks = ceil((nx * ny) / N_THREADS);
-    dim3 N_THREADS(32, 32);
-    dim3 N_BLOCKS(ceil(nx / 32.0), ceil(ny / 32));
-    InitializationKernel<<<N_BLOCKS, N_THREADS>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
+    int windowSize = 25;
+    int gridWidth = (nx + windowSize - 1) / windowSize;
+    int gridHeight = (ny + windowSize - 1) / windowSize;
 
-    // TODO: computeInterfaceSignature ?
-    computeBoundariesLines<<<N_BLOCKS, N_THREADS>>>(d_phi, nx, ny);
-    computeBoundariesColumns<<<N_BLOCKS, N_THREADS>>>(d_phi, nx, ny);
+    dim3 dimGrid(gridWidth, gridHeight);
+    dim3 dimBlock(windowSize, windowSize);
+    InitializationKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
     cudaDeviceSynchronize();
+    // TODO: computeInterfaceSignature ?
+    computeBoundariesLines<<<1, nx>>>(d_phi, nx, ny);
+    computeBoundariesColumns<<<1, ny>>>(d_phi, nx, ny);
+    cudaDeviceSynchronize();
+    CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
+
+    printBeginAndEnd(105, h_phi, nx * ny);
 
     // == Output ==
     stringstream ss;
@@ -133,13 +139,13 @@ int main(int argc, char *argv[])
     }
 
     // Free memory
-    //delete[] h_phi, h_curvature, h_u, h_v;
+    delete[] h_phi, h_curvature, h_u, h_v;
 
-    CHECK_ERROR(cudaFree((void **)&d_phi));
-    CHECK_ERROR(cudaFree((void **)&d_phi_n));
-    CHECK_ERROR(cudaFree((void **)&d_curvature));
-    CHECK_ERROR(cudaFree((void **)&d_u));
-    CHECK_ERROR(cudaFree((void **)&d_v));
+    CHECK_ERROR(cudaFree((void **)d_phi));
+    CHECK_ERROR(cudaFree((void **)d_phi_n));
+    CHECK_ERROR(cudaFree((void **)d_curvature));
+    CHECK_ERROR(cudaFree((void **)d_u));
+    CHECK_ERROR(cudaFree((void **)d_v));
 
     return 0;
 }
