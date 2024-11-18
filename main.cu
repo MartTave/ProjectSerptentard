@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
         computeInterfaceLengthKernel<<<dimGrid, dimBlock>>>(phi, d_lengths, nx, ny, dx, dy);
 
         // Diagnostics: interface curvature
-        computeInterfaceCurvature(phi, curvature, nx, ny, dx, dy);
+        computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(phi, curvature, nx, ny, dx, dy);
 
         // cudaDeviceSynchronize();
 
