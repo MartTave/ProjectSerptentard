@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     double *h_curvature = new double[nx * ny];
     double *h_u = new double[nx * ny];
     double *h_v = new double[nx * ny];
-    double *h_length = new double[nx * ny];
+    double *h_lengths = new double[nx * ny];
 
     double *d_phi;
     double *d_phi_n;
@@ -138,11 +138,11 @@ int main(int argc, char *argv[])
 
         // TODO: Memcopy from device to host (This time, no need to copy u and v)
         cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_length, d_length, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost);
         cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost);
 
-        float max = 0;
-        float total_length = 0;
+        double max = 0;
+        double total_length = 0;
 
         for (int i = 0; i < nx * ny; i++)
         {
