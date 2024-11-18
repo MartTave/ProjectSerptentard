@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
     {
         scale = stoi(argv[1]);
     }
-    nx = 100 * scale;
-    ny = 100 * scale; // Number of cells in each direction
+    nx = 10 * scale;
+    ny = 10 * scale; // Number of cells in each direction
 
     long sum = 0;
 
@@ -73,6 +73,7 @@ int main(int argc, char *argv[])
     long size = arrayLength * sizeof(double);
     int *arrStart = new int[world_size];
     int *arrEnd = new int[world_size];
+    int *splittedLengthes = new int[world_size];
     int *splittedSizes = new int[world_size];
 
     Lx = 1.0;
@@ -107,26 +108,28 @@ int main(int argc, char *argv[])
             {
                 arrStart[i] = i * (nbrOfElements + 1);
                 arrEnd[i] = (i + 1) * (nbrOfElements + 1);
-                splittedSizes[i] = (nbrOfElements + 1);
+                splittedLengthes[i] = (nbrOfElements + 1);
             }
             else
             {
                 arrStart[i] = rest * (nbrOfElements + 1) + (i - rest) * nbrOfElements;
                 arrEnd[i] = rest * (nbrOfElements + 1) + (i - rest + 1) * nbrOfElements;
-                splittedSizes[i] = nbrOfElements;
+                splittedLengthes[i] = nbrOfElements;
             }
+            splittedSizes[i] = splittedLengthes[i] * sizeof(double);
+            printf("Array start and end is : %d %d\n", arrStart[i], arrEnd[i]);
         }
     }
 
     MPI_Bcast(arrStart, world_size, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(arrEnd, world_size, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(splittedSizes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(splittedLengthes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
 
-    double *h_phi_splitted = new double[splittedSizes[world_rank]];
-    double *h_curvature_splitted = new double[splittedSizes[world_rank]];
-    double *h_lengths_splitted = new double[splittedSizes[world_rank]];
-    double *h_u_splitted = new double[splittedSizes[world_rank]];
-    double *h_v_splitted = new double[splittedSizes[world_rank]];
+    double *h_phi_splitted = new double[splittedLengthes[world_rank]];
+    double *h_curvature_splitted = new double[splittedLengthes[world_rank]];
+    double *h_lengths_splitted = new double[splittedLengthes[world_rank]];
+    double *h_u_splitted = new double[splittedLengthes[world_rank]];
+    double *h_v_splitted = new double[splittedLengthes[world_rank]];
 
     if (world_rank == 0)
     {
@@ -146,13 +149,13 @@ int main(int argc, char *argv[])
     }
 
     // Copy data from device to host
-    CHECK_ERROR(cudaMemcpy(h_phi_splitted, &d_phi[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
-    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, &d_curvature[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_phi_splitted, &d_phi[arrStart[world_rank]], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, &d_curvature[arrStart[world_rank]], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
 
-    string toWriteU = getString(h_u_splitted, splittedSizes[world_rank]);
-    string toWriteV = getString(h_v_splitted, splittedSizes[world_rank]);
-    string toWritePhi = getString(h_phi_splitted, splittedSizes[world_rank]);
-    string toWriteCurvature = getString(h_curvature_splitted, splittedSizes[world_rank]);
+    string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank]);
+    string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank]);
+    string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank]);
+    string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank]);
 
     writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank);
 
@@ -187,9 +190,9 @@ int main(int argc, char *argv[])
             // cudaDeviceSynchronize();
         }
 
-        CHECK_ERROR(cudaMemcpy(h_phi_splitted, &d_phi[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
-        CHECK_ERROR(cudaMemcpy(h_lengths_splitted, &d_lengths[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
-        CHECK_ERROR(cudaMemcpy(h_curvature_splitted, &d_curvature[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_phi_splitted, &d_phi[arrStart[world_rank]], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_lengths_splitted, &d_lengths[arrStart[world_rank]], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_curvature_splitted, &d_curvature[arrStart[world_rank]], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
         double localSum = 0;
         double localMax = 0;
         for (int i = 0; i < arraySplittedSize; i++)
@@ -203,8 +206,8 @@ int main(int argc, char *argv[])
         MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-        string toWritePhi = getString(h_phi_splitted, splittedSizes[world_rank]);
-        string toWriteCurvature = getString(h_curvature_splitted, splittedSizes[world_rank]);
+        string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank]);
+        string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank]);
 
         writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank);
 
