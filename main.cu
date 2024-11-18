@@ -135,8 +135,8 @@ int main(int argc, char *argv[])
         // cudaDeviceSynchronize();
 
         // TODO: Memcopy from device to host (This time, no need to copy u and v)
-        cudaMemCpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost);
-        cudaMemCpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost);
         // Write data to output file
         if (step % outputFrequency == 0)
         {
