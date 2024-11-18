@@ -3,5 +3,5 @@ all:
 	mpic++ -o run_serpentin main.o init.o solve.o diagnostics.o write.o -L/usr/local/cuda/lib64 -lcudart
 
 clean:
-	rm main.o
+	rm *.o
 	rm run_serpentin
