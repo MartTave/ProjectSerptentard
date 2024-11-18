@@ -125,7 +125,6 @@ int main(int argc, char *argv[])
 
         // TODO: Memcopy from device to host (This time, no need to copy u and v)
         CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
-        printBeginAndEnd(150, h_phi, nx * ny);
         CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
         CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
 

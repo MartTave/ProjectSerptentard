@@ -52,13 +52,12 @@ __global__ void solveAdvectionEquationExplicit(double *phi, double *phi_n, doubl
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (i >= nx || j >= ny)
+    if (i >= nx - 1 || j >= ny - 1 || i == 0 || j == 0)
     {
-        printf("Discarding thread %d %d\n", i, j);
         return;
     }
     int l = i * ny + j;
-    if (u[l] > 0.0)
+    if (u[l] < 0.0)
     {
         phi[l] -= dt * (u[l] * (phi_n[(i + 1) * ny + j] - phi_n[l]) / dx);
     }
