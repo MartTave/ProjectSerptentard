@@ -31,6 +31,10 @@ int main(int argc, char *argv[])
     // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     // Data Initialization
     // == Spatial ==
     if (world_rank == 0)
@@ -119,45 +123,51 @@ int main(int argc, char *argv[])
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
-
-        time += dt; // Simulation time increases
-
-        // Solve the advection equation
-        copyPhi<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, nx, ny);
-        solveAdvectionEquationExplicit<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, d_u, d_v, nx, ny, dx, dy, dt);
-
-        cudaDeviceSynchronize();
-
-        computeBoundariesLines<<<1, nx>>>(d_phi, nx, ny);
-        computeBoundariesColumns<<<1, ny>>>(d_phi, nx, ny);
-
-        cudaDeviceSynchronize();
-
-        // Diagnostics: interface perimeter
-        computeInterfaceLengthKernel<<<dimGrid, dimBlock>>>(d_phi, d_lengths, nx, ny, dx, dy);
-
-        // Diagnostics: interface curvature
-        computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, nx, ny, dx, dy);
-
-        // cudaDeviceSynchronize();
-
-        CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
-        CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
-        CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
-
         double max = 0;
         double total_length = 0;
 
-        for (int i = 0; i < nx * ny; i++)
-        {
-            if (abs(h_curvature[i]) > max)
-            {
-                max = abs(h_curvature[i]);
-            }
-            total_length += h_lengths[i];
+        if(rank == 0) {
+
+            time += dt; // Simulation time increases
+
+            // Solve the advection equation
+            copyPhi<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, nx, ny);
+            solveAdvectionEquationExplicit<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, d_u, d_v, nx, ny, dx, dy, dt);
+
+            cudaDeviceSynchronize();
+
+            computeBoundariesLines<<<1, nx>>>(d_phi, nx, ny);
+            computeBoundariesColumns<<<1, ny>>>(d_phi, nx, ny);
+
+            cudaDeviceSynchronize();
+
+            // Diagnostics: interface perimeter
+            computeInterfaceLengthKernel<<<dimGrid, dimBlock>>>(d_phi, d_lengths, nx, ny, dx, dy);
+
+            // Diagnostics: interface curvature
+            computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, nx, ny, dx, dy);
+
+            // cudaDeviceSynchronize();
+
+            CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
+            CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
+            CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
+
+            MPI_Reduce(&h_curvature, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+            MPI_Reduce(&h_lengths, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
         }
+
+        /*
+        MPI_Scatter(h_phi, recvcount, MPI_DOUBLE, h_phi, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Scatter(h_curvature, recvcount, MPI_DOUBLE, h_curvature, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Scatter(h_u, recvcount, MPI_DOUBLE, h_u, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Scatter(h_v, recvcount, MPI_DOUBLE, h_v, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&max, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&total_length, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        */
+
         // Write data to output file
-        if (step % outputFrequency == 0)
+        if (rank == 0 && step % outputFrequency == 0)
         {
             cout << "Step: " << step << "\n\n";
             writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
