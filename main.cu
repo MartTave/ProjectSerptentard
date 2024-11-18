@@ -53,6 +53,8 @@ int main(int argc, char *argv[])
 
     int count = 0; // Number of VTK file already written
     string scaleStr = ss.str();
+    // == Output ==
+    ss << scale;
     string outputName = "output/levelSet_scale" + scaleStr + "_";
 
     dim3 dimGrid, dimBlock;
@@ -69,6 +71,9 @@ int main(int argc, char *argv[])
     double *d_u;
     double *d_v;
     long size = arrayLength * sizeof(double);
+    int *arrStart = new int[world_size];
+    int *arrEnd = new int[world_size];
+    int *splittedSizes = new int[world_size];
 
     Lx = 1.0;
     Ly = 1.0; // Square domain [m]
@@ -84,8 +89,6 @@ int main(int argc, char *argv[])
     // == Numerical ==
     outputFrequency = nSteps / 40;
 
-    arraySplittedSize = (arrayLength + (arrayLength % world_size)) / world_size;
-
     size = arrayLength * sizeof(double);
 
     windowSize = 25;
@@ -96,15 +99,38 @@ int main(int argc, char *argv[])
 
     if (world_rank == 0)
     {
-
-        for (int i = arrayLength; i < arrayLength + (arrayLength % world_size); i++)
+        int rest = arrayLength % world_size;
+        int nbrOfElements = arrayLength / world_size;
+        for (int i = 0; i < world_size; i++)
         {
-            h_curvature[i] = 0;
-            h_u[i] = 0;
-            h_v[i] = 0;
-            h_lengths[i] = 0;
+            if (i < rest)
+            {
+                arrStart[i] = i * (nbrOfElements + 1);
+                arrEnd[i] = (i + 1) * (nbrOfElements + 1);
+                splittedSizes[i] = (nbrOfElements + 1);
+            }
+            else
+            {
+                arrStart[i] = rest * (nbrOfElements + 1) + (i - rest) * nbrOfElements;
+                arrEnd[i] = rest * (nbrOfElements + 1) + (i - rest + 1) * nbrOfElements;
+                splittedSizes[i] = nbrOfElements;
+            }
         }
+    }
 
+    MPI_Bcast(arrStart, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(arrEnd, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(splittedSizes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+
+    double *h_phi_splitted = new double[splittedSizes[world_rank]];
+    double *h_curvature_splitte = new double[splittedSizes[world_rank]];
+    double *h_lengths_splitted = new double[splittedSizes[world_rank]];
+    double *h_u_splitted = new double[splittedSizes[world_rank]];
+    double *h_v_splitted = new double[splittedSizes[world_rank]];
+
+    if (world_rank == 0)
+    {
+        mkdir("output", 0777); // Create output folder
         CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
         CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
         CHECK_ERROR(cudaMalloc((void **)&d_phi_n, size));
@@ -114,26 +140,21 @@ int main(int argc, char *argv[])
 
         InitializationKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
         cudaDeviceSynchronize();
-        // TODO: computeInterfaceSignature ?
         computeBoundariesLines<<<1, nx>>>(d_phi, nx, ny);
         computeBoundariesColumns<<<1, ny>>>(d_phi, nx, ny);
         cudaDeviceSynchronize();
-        CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
-        // == Output ==
-        ss << scale;
-
-        // == First output ==
-        // Write data in VTK format
-        mkdir("output", 0777); // Create output folder
-
-        // TODO: Memcopy from device to host
-        writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
     }
 
-    MPI_Bcast(&arraySplittedSize, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+    // Copy data from device to host
+    CHECK_ERROR(cudaMemcpy(h_phi_splitted, d_phi[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, d_curvature[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
 
-    double *h_curvature_splitted = new double[arraySplittedSize];
-    double *h_lengths_splitted = new double[arraySplittedSize];
+    string toWriteU = getString(h_u_splitted, splittedSizes[world_rank]);
+    string toWriteV = getString(h_v_splitted, splittedSizes[world_rank]);
+    string toWritePhi = getString(h_phi_splitted, splittedSizes[world_rank]);
+    string toWriteCurvature = getString(h_curvature_splitted, splittedSizes[world_rank]);
+
+    writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_ran);
 
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
@@ -164,12 +185,11 @@ int main(int argc, char *argv[])
             computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, nx, ny, dx, dy);
 
             // cudaDeviceSynchronize();
-
-            CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
-            CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
-            CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
         }
-        MPI_Scatter(h_curvature, arraySplittedSize, MPI_DOUBLE, h_curvature_splitted, arraySplittedSize, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+        CHECK_ERROR(cudaMemcpy(h_phi_splitted, d_phi[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_lengths_splitted, d_lengths[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_curvature_splitted, d_curvature[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
         double localSum = 0;
         double localMax = 0;
         for (int i = 0; i < arraySplittedSize; i++)
@@ -183,14 +203,15 @@ int main(int argc, char *argv[])
         MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
+        string toWritePhi = getString(h_phi_splitted, splittedSizes[world_rank]);
+        string toWriteCurvature = getString(h_curvature_splitted, splittedSizes[world_rank]);
+
+        writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank);
+
         // Write data to output file
         if (world_rank == 0 && step % outputFrequency == 0)
         {
-            auto then = high_resolution_clock::now();
             cout << "Step: " << step << "\n\n";
-            writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
-            auto now = high_resolution_clock::now();
-            sum += duration_cast<nanoseconds>(now - then).count();
         }
     }
 
