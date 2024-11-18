@@ -64,12 +64,6 @@ int main(int argc, char *argv[])
     double *h_u = new double[arrayLength + (arrayLength % world_size)];
     double *h_v = new double[arrayLength + (arrayLength % world_size)];
     double *h_lengths = new double[arrayLength + (arrayLength % world_size)];
-    double *d_phi;
-    double *d_phi_n;
-    double *d_curvature;
-    double *d_lengths;
-    double *d_u;
-    double *d_v;
     long size = arrayLength * sizeof(double);
     int *arrStart = new int[world_size];
     int *arrEnd = new int[world_size];
@@ -129,6 +123,13 @@ int main(int argc, char *argv[])
     double *h_u_splitted = new double[splittedLengthes[world_rank]];
     double *h_v_splitted = new double[splittedLengthes[world_rank]];
 
+    double *d_phi;
+    double *d_phi_n;
+    double *d_curvature;
+    double *d_lengths;
+    double *d_u;
+    double *d_v;
+
     if (world_rank == 0)
     {
         mkdir("output", 0777); // Create output folder
@@ -147,8 +148,8 @@ int main(int argc, char *argv[])
     }
 
     // Copy data from device to host
-    CHECK_ERROR(cudaMemcpy(h_phi_splitted, *(d_phi + arrStart[world_rank]), splittedSizes[world_rank], cudaMemcpyDeviceToHost));
-    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, *(d_curvature + arrStart[world_rank]), splittedSizes[world_rank], cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_phi_splitted, d_phi + 1, splittedSizes[world_rank], cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, d_curvatures + 1, splittedSizes[world_rank], cudaMemcpyDeviceToHost));
 
     string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank]);
     string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank]);
