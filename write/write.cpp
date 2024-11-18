@@ -8,8 +8,6 @@
 
 #include <bits/stdc++.h>
 
-#include "../common_includes.cu"
-
 using namespace std;
 
 string getString(double *data, long size)
