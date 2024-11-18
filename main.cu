@@ -66,24 +66,32 @@ int main(int argc, char *argv[])
     double *d_v;
     long size = arrayLength * sizeof(double);
 
+    Lx = 1.0;
+    Ly = 1.0; // Square domain [m]
+    dx = Lx / (nx - 1);
+    dy = Ly / (ny - 1); // Spatial step [m]
+
+    // == Temporal ==
+    tFinal = 4.0;              // Final time [s]
+    dt = 0.005 / scale;        // Temporal step [s]
+    nSteps = int(tFinal / dt); // Number of steps to perform
+    time = 0.0;                // Actual Simulation time [s]
+
+    // == Numerical ==
+    outputFrequency = nSteps / 40;
+
+    arraySplittedSize = (arrayLength + (arrayLength % world_size)) / world_size;
+
+    size = arrayLength * sizeof(double);
+
+    windowSize = 25;
+    gridWidth = (nx + windowSize - 1) / windowSize;
+    gridHeight = (ny + windowSize - 1) / windowSize;
+    dimGrid = dim3(gridWidth, gridHeight);
+    dimBlock = dim3(windowSize, windowSize);
+
     if (world_rank == 0)
     {
-
-        Lx = 1.0;
-        Ly = 1.0; // Square domain [m]
-        dx = Lx / (nx - 1);
-        dy = Ly / (ny - 1); // Spatial step [m]
-
-        // == Temporal ==
-        tFinal = 4.0;              // Final time [s]
-        dt = 0.005 / scale;        // Temporal step [s]
-        nSteps = int(tFinal / dt); // Number of steps to perform
-        time = 0.0;                // Actual Simulation time [s]
-
-        // == Numerical ==
-        outputFrequency = nSteps / 40;
-
-        arraySplittedSize = (arrayLength + (arrayLength % world_size)) / world_size;
 
         for (int i = arrayLength; i < arrayLength + (arrayLength % world_size); i++)
         {
@@ -92,7 +100,6 @@ int main(int argc, char *argv[])
             h_v[i] = 0;
             h_lengths[i] = 0;
         }
-        size = arrayLength * sizeof(double);
 
         CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
         CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
@@ -100,12 +107,6 @@ int main(int argc, char *argv[])
         CHECK_ERROR(cudaMalloc((void **)&d_curvature, size));
         CHECK_ERROR(cudaMalloc((void **)&d_u, size));
         CHECK_ERROR(cudaMalloc((void **)&d_v, size));
-
-        windowSize = 25;
-        gridWidth = (nx + windowSize - 1) / windowSize;
-        gridHeight = (ny + windowSize - 1) / windowSize;
-        dimGrid = dim3(gridWidth, gridHeight);
-        dimBlock = dim3(windowSize, windowSize);
 
         InitializationKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
         cudaDeviceSynchronize();
