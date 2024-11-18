@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
     size_t size = nx * ny * sizeof(double);
 
     CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
+    CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
     CHECK_ERROR(cudaMalloc((void **)&d_phi_n, size));
     CHECK_ERROR(cudaMalloc((void **)&d_curvature, size));
     CHECK_ERROR(cudaMalloc((void **)&d_u, size));
