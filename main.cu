@@ -57,11 +57,21 @@ int main(int argc, char *argv[])
         // == Numerical ==
         int outputFrequency = nSteps / 40;
 
-        double *h_phi = new double[nx * ny];
-        double *h_curvature = new double[nx * ny];
-        double *h_u = new double[nx * ny];
-        double *h_v = new double[nx * ny];
-        double *h_lengths = new double[nx * ny];
+        long arrayLength = nx * ny;
+
+        double *h_phi = new double[arrayLength];
+        double *h_curvature = new double[arrayLength + (arrayLength % world_size)];
+        double *h_u = new double[arrayLength + (arrayLength % world_size)];
+        double *h_v = new double[arrayLength + (arrayLength % world_size)];
+        double *h_lengths = new double[arrayLength + (arrayLength % world_size)];
+
+        for (int i = arrayLength; i < arrayLength + (arrayLength % world_size); i++)
+        {
+            h_curvature[i] = 0;
+            h_u[i] = 0;
+            h_v[i] = 0;
+            h_lengths[i] = 0;
+        }
 
         double *d_phi;
         double *d_phi_n;
@@ -69,7 +79,7 @@ int main(int argc, char *argv[])
         double *d_lengths;
         double *d_u;
         double *d_v;
-        long size = nx * ny * sizeof(double);
+        long size = arrayLength * sizeof(double);
 
         CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
         CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
