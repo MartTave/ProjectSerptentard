@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
     double *d_u;
     double *d_v;
 
-    size_t size = nx * ny * sizeof(double);
+    long size = nx * ny * sizeof(double);
 
     CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
     CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
@@ -123,7 +123,6 @@ int main(int argc, char *argv[])
 
         // cudaDeviceSynchronize();
 
-        // TODO: Memcopy from device to host (This time, no need to copy u and v)
         CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
         CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
         CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
@@ -142,7 +141,7 @@ int main(int argc, char *argv[])
         // Write data to output file
         if (step % outputFrequency == 0)
         {
-            cout << "Step: " << step << " Time: " << time << " Max curvature: " << max << " Total length: " << total_length << "\n\n";
+            cout << "Step: " << step << "\n\n";
             writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
         }
     }
