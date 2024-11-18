@@ -195,6 +195,6 @@ int main(int argc, char *argv[])
         CHECK_ERROR(cudaFree((void **)d_u));
         CHECK_ERROR(cudaFree((void **)d_v));
     }
-
+    MPI_Finalize();
     return 0;
 }
