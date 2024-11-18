@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
     }
 
     // Copy data from device to host
-    printf("Size is : %d", arrStart[world_rank]);
+    printf("Copying from index %d to %d, total nbr of element is : %d", arrStart[world_rank], arrEnd[world_rank], splittedLengthes[world_rank]);
     CHECK_ERROR(cudaMemcpy(h_phi_splitted, d_phi + 1, splittedSizes[world_rank], cudaMemcpyDeviceToHost));
     CHECK_ERROR(cudaMemcpy(h_curvature_splitted, d_curvature + 1, splittedSizes[world_rank], cudaMemcpyDeviceToHost));
 
