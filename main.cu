@@ -129,10 +129,10 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
 
         // Diagnostics: interface perimeter
-        computeInterfaceLengthKernel<<<dimGrid, dimBlock>>>(phi, d_lengths, nx, ny, dx, dy);
+        computeInterfaceLengthKernel<<<dimGrid, dimBlock>>>(d_phi, d_lengths, nx, ny, dx, dy);
 
         // Diagnostics: interface curvature
-        computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(phi, curvature, nx, ny, dx, dy);
+        computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, nx, ny, dx, dy);
 
         // cudaDeviceSynchronize();
 
@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
             {
                 max = abs(h_curvature[i]);
             }
-            total_length += h_length[i];
+            total_length += h_lengths[i];
         }
         // Write data to output file
         if (step % outputFrequency == 0)
