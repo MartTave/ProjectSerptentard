@@ -176,8 +176,8 @@ int main(int argc, char *argv[])
                 localMax = abs(h_curvature_splitted[i]);
             }
         }
-        MPI_Reduce(localMax, &max, arraySplittedSize, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-        MPI_Reduce(localSum, &total_length, arraySplittedSize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
         // MPI_Scatter(h_phi, recvcount, MPI_DOUBLE, h_phi, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         // MPI_Scatter(h_curvature, recvcount, MPI_DOUBLE, h_curvature, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         // MPI_Scatter(h_u, recvcount, MPI_DOUBLE, h_u, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
