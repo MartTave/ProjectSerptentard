@@ -57,9 +57,6 @@ int main(int argc, char *argv[])
     double *d_v;
     long size = arrayLength * sizeof(double);
 
-    double *h_curvature_splitted = new double[arraySplittedSize];
-    double *h_lengths_splitted = new double[arraySplittedSize];
-
     if (world_rank == 0)
     {
         scale = 10;
@@ -130,6 +127,9 @@ int main(int argc, char *argv[])
     }
 
     MPI_Bcast(&arraySplittedSize, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+
+    double *h_curvature_splitted = new double[arraySplittedSize];
+    double *h_lengths_splitted = new double[arraySplittedSize];
 
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
