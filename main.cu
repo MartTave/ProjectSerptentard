@@ -94,8 +94,6 @@ int main(int argc, char *argv[])
     cudaDeviceSynchronize();
     CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
 
-    printBeginAndEnd(105, h_phi, nx * ny);
-
     // == Output ==
     stringstream ss;
     ss << scale;
@@ -116,7 +114,6 @@ int main(int argc, char *argv[])
     {
 
         time += dt; // Simulation time increases
-        cout << "\nStarting iteration step " << step << "/" << nSteps << "\tTime " << time << "s\n";
 
         // Solve the advection equation
         solveAdvectionEquationExplicit<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, d_u, d_v, nx, ny, dx, dy, dt);
@@ -155,6 +152,7 @@ int main(int argc, char *argv[])
         // Write data to output file
         if (step % outputFrequency == 0)
         {
+            cout << "Step: " << step << " Time: " << time << " Max curvature: " << max << " Total length: " << total_length << endl;
             writeDataVTK(outputName, phi, curvature, u, v, nx, ny, dx, dy, count++);
         }
     }
