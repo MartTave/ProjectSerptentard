@@ -33,6 +33,14 @@ int main(int argc, char *argv[])
 
     // Variables declaration
     int nx, ny, nSteps, scale, outputFrequency, gridWidth, gridHeight, windowSize;
+    scale = 10;
+    if (argc > 1)
+    {
+        scale = stoi(argv[1]);
+    }
+    nx = 100 * scale;
+    ny = 100 * scale; // Number of cells in each direction
+
     double Lx, Ly, dx, dy, tFinal, dt, time;
 
     long arrayLength, arraySplittedSize;
@@ -60,14 +68,7 @@ int main(int argc, char *argv[])
 
     if (world_rank == 0)
     {
-        scale = 10;
-        if (argc > 1)
-        {
-            scale = stoi(argv[1]);
-        }
 
-        nx = 100 * scale;
-        ny = 100 * scale; // Number of cells in each direction
         Lx = 1.0;
         Ly = 1.0; // Square domain [m]
         dx = Lx / (nx - 1);
