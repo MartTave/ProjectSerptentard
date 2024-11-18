@@ -134,9 +134,9 @@ int main(int argc, char *argv[])
         // cudaDeviceSynchronize();
 
         // TODO: Memcopy from device to host (This time, no need to copy u and v)
-        cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost);
+        CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
 
         double max = 0;
         double total_length = 0;
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
         // Write data to output file
         if (step % outputFrequency == 0)
         {
-            cout << "Step: " << step << " Time: " << time << " Max curvature: " << max << " Total length: " << total_length << endl;
+            cout << "Step: " << step << " Time: " << time << " Max curvature: " << max << " Total length: " << total_length << "\n\n";
             writeDataVTK(outputName, phi, curvature, u, v, nx, ny, dx, dy, count++);
         }
     }
