@@ -121,32 +121,36 @@ void writeDataMPIVTK(const string filename, double *phi, double *curvature, doub
     filename_all.resize(7);
     reverse(filename_all.begin(), filename_all.end());
     filename_all = filename + filename_all + ".vtk";
-
-    // Inform user the output filename
-    cout << "Writing data into " << filename_all << "\n";
+    if (rank == 0)
+        // Inform user the output filename
+        cout << "Writing data into " << filename_all << "\n";
 
     // Setting open file using output file streaming
     //ofstream myfile;
     //myfile.open(filename_all);
-
-    MPI_File_open(MPI_COMM_WORLD, filename_all,
+    char filenameCH[sizeof(filename_all) + 1];
+    strcpy(filenameCH, filename_all.c_str());
+    MPI_File_open(MPI_COMM_WORLD, filenameCH,
         MPI_MODE_CREATE|MPI_MODE_WRONLY,
         MPI_INFO_NULL, &fh);
-
 
     if (rank == 0)
     {
         char txt[]="# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET RECTILINEAR_GRID\n";
-        MPI_File_write_all(fh, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
-        txt="DIMENSIONS " + nx + " " + ny + " 1\n";
         MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
-        txt="X_COORDINATES " + nx + " float\n";
+        string text="DIMENSIONS " + to_string(nx) + " " + to_string(ny) + " 1\n";
+        char txt[sizeof(text)+1];
+        strcpy(txt, text.c_str());
+        MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
+        string text="X_COORDINATES " + to_string(nx) + " float\n";
+        char txt[sizeof(text)+1];
+        strcpy(txt, text.c_str());
         MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
 
         string out;
         for (int i = 0; i < nx; i++)
         {
-            out += i * dx + "\n";
+            out += to_string(i * dx) + "\n";
         }
         char arr[sizeof(out) + 1];
 
@@ -155,12 +159,14 @@ void writeDataMPIVTK(const string filename, double *phi, double *curvature, doub
         strcpy(arr, out.c_str());
         MPI_File_write_all(fh, arr, sizeof(arr), MPI_CHAR, MPI_STATUS_IGNORE);
 
-        txt="Y_COORDINATES " + nx + " float\n";
+        string text="Y_COORDINATES " + to_string(nx) + " float\n";
+        char txt[sizeof(text)+1];
+        strcpy(txt, text.c_str());
         MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
         out="";
         for (int j = 0; j < ny; j++)
         {
-            out += j * dy + "\n";
+            out += to_string(j * dy) + "\n";
         }
         char arr[sizeof(out) + 1];
 
@@ -169,14 +175,16 @@ void writeDataMPIVTK(const string filename, double *phi, double *curvature, doub
         strcpy(arr, out.c_str());
         MPI_File_write_all(fh, arr, sizeof(arr), MPI_CHAR, MPI_STATUS_IGNORE);
 
-        txt = "Z_COORDINATES 1 float\n0\n"+"POINT_DATA " + nx * ny + "\nSCALARS phi float 1\nLOOKUP_TABLE default\n";
-
+        string text = "Z_COORDINATES 1 float\n0\nPOINT_DATA " + to_string(nx * ny) + "\nSCALARS phi float 1\nLOOKUP_TABLE default\n";
+        char txt[sizeof(text)+1];
+        strcpy(txt, text.c_str());
+        MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
     if(rank==0){
         MPI_Scatter(curvature, elem_pr_proc, MPI_DOUBLE, part,
-            elements_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
+            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -187,7 +195,7 @@ void writeDataMPIVTK(const string filename, double *phi, double *curvature, doub
     MPI_Barrier(MPI_COMM_WORLD);
     if(rank==0){
         MPI_Scatter(phi, elem_pr_proc, MPI_DOUBLE, part,
-            elements_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
+            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -199,13 +207,13 @@ void writeDataMPIVTK(const string filename, double *phi, double *curvature, doub
 
     if(rank==0){
         char txt[]="\nSCALARS u float 1\nLOOKUP_TABLE default\n";
-        MPI_File_write_all(fh, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
+        MPI_File_write_all(fh, txt,sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
     }
 
 
     if(rank==0){
         MPI_Scatter(u, elem_pr_proc, MPI_DOUBLE, part,
-            elements_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
+            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -217,12 +225,12 @@ void writeDataMPIVTK(const string filename, double *phi, double *curvature, doub
     
     if(rank==0){
         char txt[]="\nSCALARS v float 1\nLOOKUP_TABLE default\n";
-        MPI_File_write_all(fh, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
+        MPI_File_write_all(fh, txt,sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
     }
 
     if(rank==0){
         MPI_Scatter(v, elem_pr_proc, MPI_DOUBLE, part,
-            elements_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
+            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -234,12 +242,12 @@ void writeDataMPIVTK(const string filename, double *phi, double *curvature, doub
 
     if(rank==0){
         char txt[]="\nSCALARS curvature float 1\nLOOKUP_TABLE default\n";
-        MPI_File_write_all(fh, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
+        MPI_File_write_all(fh, txt,sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
     }
 
     if(rank==0){
         MPI_Scatter(curvature, elem_pr_proc, MPI_DOUBLE, part,
-            elements_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
+            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     }
     MPI_Barrier(MPI_COMM_WORLD);
