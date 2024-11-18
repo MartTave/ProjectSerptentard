@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
     double Lx, Ly, dx, dy, tFinal, dt, time;
 
     long arrayLength, arraySplittedSize;
+    arrayLength = nx * ny;
     stringstream ss;
 
     int count = 0; // Number of VTK file already written
@@ -81,7 +82,6 @@ int main(int argc, char *argv[])
         // == Numerical ==
         outputFrequency = nSteps / 40;
 
-        arrayLength = nx * ny;
         arraySplittedSize = arrayLength + (arrayLength % world_size);
 
         arraySplittedSize = arrayLength + (arrayLength % world_size);
