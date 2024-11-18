@@ -128,6 +128,8 @@ int main(int argc, char *argv[])
 
     MPI_Bcast(&arraySplittedSize, 1, MPI_LONG, 0, MPI_COMM_WORLD);
 
+    printf("Ahahah the alloc is : %ld\n", arraySplittedSize);
+
     double *h_curvature_splitted = new double[arraySplittedSize];
     double *h_lengths_splitted = new double[arraySplittedSize];
 
