@@ -83,9 +83,7 @@ int main(int argc, char *argv[])
         // == Numerical ==
         outputFrequency = nSteps / 40;
 
-        arraySplittedSize = arrayLength + (arrayLength % world_size);
-
-        arraySplittedSize = arrayLength + (arrayLength % world_size);
+        arraySplittedSize = (arrayLength + (arrayLength % world_size)) / world_size;
 
         for (int i = arrayLength; i < arrayLength + (arrayLength % world_size); i++)
         {
