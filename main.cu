@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     mkdir("output", 0777); // Create output folder
 
     // TODO: Memcopy from device to host
-    writeDataVTK(outputName, phi, curvature, u, v, nx, ny, dx, dy, count++);
+    writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
 
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
