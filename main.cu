@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
     MPI_Bcast(splittedSizes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
 
     double *h_phi_splitted = new double[splittedSizes[world_rank]];
-    double *h_curvature_splitte = new double[splittedSizes[world_rank]];
+    double *h_curvature_splitted = new double[splittedSizes[world_rank]];
     double *h_lengths_splitted = new double[splittedSizes[world_rank]];
     double *h_u_splitted = new double[splittedSizes[world_rank]];
     double *h_v_splitted = new double[splittedSizes[world_rank]];
@@ -146,15 +146,15 @@ int main(int argc, char *argv[])
     }
 
     // Copy data from device to host
-    CHECK_ERROR(cudaMemcpy(h_phi_splitted, d_phi[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
-    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, d_curvature[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_phi_splitted, &d_phi[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, &d_curvature[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
 
     string toWriteU = getString(h_u_splitted, splittedSizes[world_rank]);
     string toWriteV = getString(h_v_splitted, splittedSizes[world_rank]);
     string toWritePhi = getString(h_phi_splitted, splittedSizes[world_rank]);
     string toWriteCurvature = getString(h_curvature_splitted, splittedSizes[world_rank]);
 
-    writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_ran);
+    writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank);
 
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
@@ -187,9 +187,9 @@ int main(int argc, char *argv[])
             // cudaDeviceSynchronize();
         }
 
-        CHECK_ERROR(cudaMemcpy(h_phi_splitted, d_phi[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
-        CHECK_ERROR(cudaMemcpy(h_lengths_splitted, d_lengths[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
-        CHECK_ERROR(cudaMemcpy(h_curvature_splitted, d_curvature[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_phi_splitted, &d_phi[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_lengths_splitted, &d_lengths[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_curvature_splitted, &d_curvature[arrStart[world_rank]], splittedSizes[world_rank] * sizeof(double), cudaMemcpyDeviceToHost));
         double localSum = 0;
         double localMax = 0;
         for (int i = 0; i < arraySplittedSize; i++)

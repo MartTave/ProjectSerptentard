@@ -6,6 +6,6 @@
 
 using namespace std;
 
-void writeDataVTK(const string filename, double *phi, double *curvature, double *u, double *v, const int nx, const int ny, const double dx, const double dy, const int step);
-string getString(double *data, long size)
+void writeDataVTK(const string filename, string phi_part, string curvature_part, string u_part, string v_part, const int nx, const int ny, const double dx, const double dy, const int step, const int world_rank);
+string getString(double *data, long size);
 #endif // WRITE_H
