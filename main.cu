@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
         double max = 0;
         double total_length = 0;
 
-        if (rank == 0)
+        if (world_rank == 0)
         {
 
             time += dt; // Simulation time increases
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
         // MPI_Bcast(&total_length, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
         // Write data to output file
-        if (rank == 0 && step % outputFrequency == 0)
+        if (world_rank == 0 && step % outputFrequency == 0)
         {
             cout << "Step: " << step << "\n\n";
             writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
