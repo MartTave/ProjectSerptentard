@@ -31,43 +31,58 @@ int main(int argc, char *argv[])
     // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-    // Data Initialization
-    // == Spatial ==
+    // Variables declaration
+    int nx, ny, nSteps, scale, outputFrequency, gridWidth, gridHeight, windowSize;
+    double Lx, Ly, dx, dy, tFinal, dt, time;
 
-    long arraySplittedSize;
+    long arrayLength, arraySplittedSize;
+
+    dim3 dimGrid, dimBlock;
+
+    double *h_phi = new double[arrayLength];
+    double *h_curvature = new double[arrayLength + (arrayLength % world_size)];
+    double *h_u = new double[arrayLength + (arrayLength % world_size)];
+    double *h_v = new double[arrayLength + (arrayLength % world_size)];
+    double *h_lengths = new double[arrayLength + (arrayLength % world_size)];
+    double *d_phi;
+    double *d_phi_n;
+    double *d_curvature;
+    double *d_lengths;
+    double *d_u;
+    double *d_v;
+    long size = arrayLength * sizeof(double);
+
+    double *h_curvature_splitted = new double[arraySplittedSize];
+    double *h_lengths_splitted = new double[arraySplittedSize];
 
     if (world_rank == 0)
     {
-        int scale = 10;
+        scale = 10;
         if (argc > 1)
         {
             scale = stoi(argv[1]);
         }
 
-        int nx = 100 * scale;
-        int ny = 100 * scale; // Number of cells in each direction
-        double Lx = 1.0;
-        double Ly = 1.0; // Square domain [m]
-        double dx = Lx / (nx - 1);
-        double dy = Ly / (ny - 1); // Spatial step [m]
+        nx = 100 * scale;
+        ny = 100 * scale; // Number of cells in each direction
+        Lx = 1.0;
+        Ly = 1.0; // Square domain [m]
+        dx = Lx / (nx - 1);
+        dy = Ly / (ny - 1); // Spatial step [m]
 
         // == Temporal ==
-        double tFinal = 4.0;           // Final time [s]
-        double dt = 0.005 / scale;     // Temporal step [s]
-        int nSteps = int(tFinal / dt); // Number of steps to perform
-        double time = 0.0;             // Actual Simulation time [s]
+        tFinal = 4.0;              // Final time [s]
+        dt = 0.005 / scale;        // Temporal step [s]
+        nSteps = int(tFinal / dt); // Number of steps to perform
+        time = 0.0;                // Actual Simulation time [s]
 
         // == Numerical ==
-        int outputFrequency = nSteps / 40;
+        outputFrequency = nSteps / 40;
 
-        long arrayLength = nx * ny;
+        arrayLength = nx * ny;
         arraySplittedSize = arrayLength + (arrayLength % world_size);
 
-        double *h_phi = new double[arrayLength];
-        double *h_curvature = new double[arrayLength + (arrayLength % world_size)];
-        double *h_u = new double[arrayLength + (arrayLength % world_size)];
-        double *h_v = new double[arrayLength + (arrayLength % world_size)];
-        double *h_lengths = new double[arrayLength + (arrayLength % world_size)];
+        arraySplittedSize = arrayLength + (arrayLength % world_size);
 
         for (int i = arrayLength; i < arrayLength + (arrayLength % world_size); i++)
         {
@@ -76,14 +91,7 @@ int main(int argc, char *argv[])
             h_v[i] = 0;
             h_lengths[i] = 0;
         }
-
-        double *d_phi;
-        double *d_phi_n;
-        double *d_curvature;
-        double *d_lengths;
-        double *d_u;
-        double *d_v;
-        long size = arrayLength * sizeof(double);
+        size = arrayLength * sizeof(double);
 
         CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
         CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
@@ -92,12 +100,12 @@ int main(int argc, char *argv[])
         CHECK_ERROR(cudaMalloc((void **)&d_u, size));
         CHECK_ERROR(cudaMalloc((void **)&d_v, size));
 
-        int windowSize = 25;
-        int gridWidth = (nx + windowSize - 1) / windowSize;
-        int gridHeight = (ny + windowSize - 1) / windowSize;
+        windowSize = 25;
+        gridWidth = (nx + windowSize - 1) / windowSize;
+        gridHeight = (ny + windowSize - 1) / windowSize;
+        dimGrid = dim3(gridWidth, gridHeight);
+        dimBlock = dim3(windowSize, windowSize);
 
-        dim3 dimGrid(gridWidth, gridHeight);
-        dim3 dimBlock(windowSize, windowSize);
         InitializationKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
         cudaDeviceSynchronize();
         // TODO: computeInterfaceSignature ?
@@ -121,9 +129,6 @@ int main(int argc, char *argv[])
     }
 
     MPIBroadcast(&arraySplittedSize, 1, MPI_LONG, 0, MPI_COMM_WORLD);
-
-    double *h_curvature_splitted = new double[arraySplittedSize];
-    double *h_lengths_splitted = new double[arraySplittedSize];
 
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
