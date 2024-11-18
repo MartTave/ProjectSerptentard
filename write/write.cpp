@@ -7,8 +7,9 @@
 
 using namespace std;
 
-// Write data to VTK file  
-void writeDataVTK(const string filename, double** phi, double** curvature, double** u, double** v, const int nx, const int ny, const double dx, const double dy, const int step){
+// Write data to VTK file
+void writeDataVTK(const string filename, double *phi, double *curvature, double *u, double *v, const int nx, const int ny, const double dx, const double dy, const int step)
+{
 
     // Create the filename 
     string filename_all = "0000000"+to_string(step);
@@ -45,43 +46,38 @@ void writeDataVTK(const string filename, double** phi, double** curvature, doubl
     myfile << "SCALARS phi float 1\n";
     myfile << "LOOKUP_TABLE default\n";
 
-    for (int j = 0; j < ny; j++){
-        for (int i = 0; i < nx; i++){
-            myfile << phi[i][j] << "\n";
-        }
+    for (int i = 0; i < ny * nx; i++)
+    {
+        myfile << phi[i] << "\n";
     }
 
     // Write the x velocity values (loop over ny then nx)
     myfile << "\nSCALARS u float 1\n";
     myfile << "LOOKUP_TABLE default\n";
 
-    for (int j = 0; j < ny; j++){
-        for (int i = 0; i < nx; i++){
-            myfile << u[i][j] << "\n";
-        }
+    for (int i = 0; i < nx * ny; i++)
+    {
+        myfile << u[i] << "\n";
     }
 
     // Write the y velocity values (loop over ny then nx)
     myfile << "\nSCALARS v float 1\n";
     myfile << "LOOKUP_TABLE default\n";
 
-    for (int j = 0; j < ny; j++){
-        for (int i = 0; i < nx; i++){
-            myfile << v[i][j] << "\n";
-        }
+    for (int i = 0; i < nx * ny; i++)
+    {
+        myfile << v[i] << "\n";
     }
 
     // Write the curvature values (loop over ny then nx)
     myfile << "\nSCALARS curvature float 1\n";
     myfile << "LOOKUP_TABLE default\n";
 
-    for (int j = 0; j < ny; j++){
-        for (int i = 0; i < nx; i++){
-            myfile << curvature[i][j] << "\n";
-        }
+    for (int i = 0; i < nx * ny; i++)
+    {
+        myfile << curvature[i] << "\n";
     }
 
     // Close file
     myfile.close();
-
 }
