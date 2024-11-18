@@ -36,6 +36,10 @@ int main(int argc, char *argv[])
     double Lx, Ly, dx, dy, tFinal, dt, time;
 
     long arrayLength, arraySplittedSize;
+    stringstream ss;
+
+    string scaleStr = ss.str();
+    string outputName = "output/levelSet_scale" + scaleStr + "_";
 
     dim3 dimGrid, dimBlock;
 
@@ -114,10 +118,7 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
         CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
         // == Output ==
-        stringstream ss;
         ss << scale;
-        string scaleStr = ss.str();
-        string outputName = "output/levelSet_scale" + scaleStr + "_";
         int count = 0; // Number of VTK file already written
 
         // == First output ==
@@ -128,7 +129,7 @@ int main(int argc, char *argv[])
         writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
     }
 
-    MPIBroadcast(&arraySplittedSize, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&arraySplittedSize, 1, MPI_LONG, 0, MPI_COMM_WORLD);
 
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
