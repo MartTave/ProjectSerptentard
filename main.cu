@@ -127,15 +127,16 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
 
         // Diagnostics: interface perimeter
-        computeInterfaceLength(phi, nx, ny, dx, dy);
+        // computeInterfaceLength(phi, nx, ny, dx, dy);
 
         // Diagnostics: interface curvature
-        computeInterfaceCurvature(phi, curvature, nx, ny, dx, dy);
+        // computeInterfaceCurvature(phi, curvature, nx, ny, dx, dy);
 
-        cudaDeviceSynchronize();
+        // cudaDeviceSynchronize();
 
         // TODO: Memcopy from device to host (This time, no need to copy u and v)
-
+        cudaMemCpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost);
+        cudaMemCpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost);
         // Write data to output file
         if (step % outputFrequency == 0)
         {
