@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
     }
 
-    size_t pointerSize = sizeof(*void);
+    size_t pointerSize = sizeof(*double);
 
     MPI_Bcast(&d_phi, pointerSize, MPI_BYTE, 0, MPI_COMM_WORLD);
     MPI_Bcast(&d_curvature, pointerSize, MPI_BYTE, 0, MPI_COMM_WORLD);
