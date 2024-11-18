@@ -105,6 +105,7 @@ int main(int argc, char *argv[])
         time += dt; // Simulation time increases
 
         // Solve the advection equation
+        copyPhi<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, nx, ny);
         solveAdvectionEquationExplicit<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, d_u, d_v, nx, ny, dx, dy, dt);
 
         cudaDeviceSynchronize();

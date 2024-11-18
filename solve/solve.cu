@@ -54,6 +54,7 @@ __global__ void solveAdvectionEquationExplicit(double *phi, double *phi_n, doubl
 
     if (i >= nx || j >= ny)
     {
+        printf("Discarding thread %d %d\n", i, j);
         return;
     }
     int l = i * ny + j;
