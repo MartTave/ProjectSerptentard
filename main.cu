@@ -31,12 +31,11 @@ int main(int argc, char *argv[])
     // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
     // Data Initialization
     // == Spatial ==
+
+    long arraySplittedSize;
+
     if (world_rank == 0)
     {
         int scale = 10;
@@ -62,6 +61,7 @@ int main(int argc, char *argv[])
         int outputFrequency = nSteps / 40;
 
         long arrayLength = nx * ny;
+        arraySplittedSize = arrayLength + (arrayLength % world_size);
 
         double *h_phi = new double[arrayLength];
         double *h_curvature = new double[arrayLength + (arrayLength % world_size)];
@@ -119,14 +119,20 @@ int main(int argc, char *argv[])
         // TODO: Memcopy from device to host
         writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
     }
-    return 0;
+
+    MPIBroadcast(&arraySplittedSize, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+
+    double *h_curvature_splitted = new double[arraySplittedSize];
+    double *h_lengths_splitted = new double[arraySplittedSize];
+
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
         double max = 0;
         double total_length = 0;
 
-        if(rank == 0) {
+        if (rank == 0)
+        {
 
             time += dt; // Simulation time increases
 
@@ -152,19 +158,16 @@ int main(int argc, char *argv[])
             CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
             CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
             CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
-
-            MPI_Reduce(&h_curvature, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-            MPI_Reduce(&h_lengths, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
         }
-
-        /*
-        MPI_Scatter(h_phi, recvcount, MPI_DOUBLE, h_phi, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Scatter(h_curvature, recvcount, MPI_DOUBLE, h_curvature, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Scatter(h_u, recvcount, MPI_DOUBLE, h_u, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Scatter(h_v, recvcount, MPI_DOUBLE, h_v, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&max, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&total_length, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        */
+        MPI_Scatter(h_curvature, arraySplittedSize, MPI_DOUBLE, h_curvature_splitted, arraySplittedSize, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Reduce(h_curvature, &max, arraySplittedSize, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+        MPI_Reduce(h_lengths, &total_length, arraySplittedSize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        // MPI_Scatter(h_phi, recvcount, MPI_DOUBLE, h_phi, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        // MPI_Scatter(h_curvature, recvcount, MPI_DOUBLE, h_curvature, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        // MPI_Scatter(h_u, recvcount, MPI_DOUBLE, h_u, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        // MPI_Scatter(h_v, recvcount, MPI_DOUBLE, h_v, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        // MPI_Bcast(&max, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        // MPI_Bcast(&total_length, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
         // Write data to output file
         if (rank == 0 && step % outputFrequency == 0)
