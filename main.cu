@@ -116,6 +116,7 @@ int main(int argc, char *argv[])
     MPI_Bcast(arrStart, world_size, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(arrEnd, world_size, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(splittedLengthes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(splittedSizes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
 
     double *h_phi_splitted = new double[splittedLengthes[world_rank]];
     double *h_curvature_splitted = new double[splittedLengthes[world_rank]];
