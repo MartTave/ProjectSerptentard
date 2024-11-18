@@ -42,20 +42,6 @@ int main(int argc, char *argv[])
     int nSteps = int(tFinal / dt); // Number of steps to perform
     double time = 0.0;             // Actual Simulation time [s]
 
-
-    double** phi = new double*[nx]; // LevelSet field
-    double** curvature = new double*[nx]; // Curvature field
-    double** u = new double*[nx]; // Velocity field in x-direction
-    double** v = new double*[nx]; // Velocity field in y-direction
-    for (int i = 0; i < nx; ++i) {
-        phi[i] = new double[ny];
-        curvature[i] = new double[ny];
-        u[i] = new double[ny];
-        v[i] = new double[ny];
-    }
-
-
-
     // == Numerical ==
     int outputFrequency = nSteps / 40;
 
@@ -138,7 +124,6 @@ int main(int argc, char *argv[])
 
         // TODO: Memcopy from device to host (This time, no need to copy u and v)
         CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
-        printBeginAndEnd(150, h_phi, nx * ny);
         CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
         CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
 
@@ -157,7 +142,7 @@ int main(int argc, char *argv[])
         if (step % outputFrequency == 0)
         {
             cout << "Step: " << step << " Time: " << time << " Max curvature: " << max << " Total length: " << total_length << "\n\n";
-            writeDataVTK(outputName, phi, curvature, u, v, nx, ny, dx, dy, count++);
+            writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
         }
     }
 
