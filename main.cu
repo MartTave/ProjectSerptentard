@@ -147,8 +147,8 @@ int main(int argc, char *argv[])
     }
 
     // Copy data from device to host
-    CHECK_ERROR(cudaMemcpy(h_phi_splitted, d_phi + arrStart[world_rank], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
-    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, d_curvature + arrStart[world_rank], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_phi_splitted, *(d_phi + arrStart[world_rank]), splittedSizes[world_rank], cudaMemcpyDeviceToHost));
+    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, *(d_curvature + arrStart[world_rank]), splittedSizes[world_rank], cudaMemcpyDeviceToHost));
 
     string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank]);
     string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank]);
