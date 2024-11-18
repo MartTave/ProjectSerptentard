@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
     long arrayLength, arraySplittedSize;
     stringstream ss;
 
+    int count = 0; // Number of VTK file already written
     string scaleStr = ss.str();
     string outputName = "output/levelSet_scale" + scaleStr + "_";
 
@@ -119,7 +120,6 @@ int main(int argc, char *argv[])
         CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
         // == Output ==
         ss << scale;
-        int count = 0; // Number of VTK file already written
 
         // == First output ==
         // Write data in VTK format
