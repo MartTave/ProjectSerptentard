@@ -7,7 +7,7 @@
 #include <cuda.h>
 
 // == User lib ==
-#include "diagnostics/diagnostics.h"
+#include "diagnostics/diagnostics.cuh"
 #include "initialization/init.cuh"
 #include "solve/solve.cuh"
 #include "write/write.h"
@@ -63,10 +63,12 @@ int main(int argc, char *argv[])
     double *h_curvature = new double[nx * ny];
     double *h_u = new double[nx * ny];
     double *h_v = new double[nx * ny];
+    double *h_length = new double[nx * ny];
 
     double *d_phi;
     double *d_phi_n;
     double *d_curvature;
+    double *d_lengths;
     double *d_u;
     double *d_v;
 
@@ -127,16 +129,29 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
 
         // Diagnostics: interface perimeter
-        // computeInterfaceLength(phi, nx, ny, dx, dy);
+        computeInterfaceLengthKernel<<<dimGrid, dimBlock>>>(phi, d_lengths, nx, ny, dx, dy);
 
         // Diagnostics: interface curvature
-        // computeInterfaceCurvature(phi, curvature, nx, ny, dx, dy);
+        computeInterfaceCurvature(phi, curvature, nx, ny, dx, dy);
 
         // cudaDeviceSynchronize();
 
         // TODO: Memcopy from device to host (This time, no need to copy u and v)
         cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_length, d_length, size, cudaMemcpyDeviceToHost);
         cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost);
+
+        float max = 0;
+        float total_length = 0;
+
+        for (int i = 0; i < nx * ny; i++)
+        {
+            if (abs(h_curvature[i]) > max)
+            {
+                max = abs(h_curvature[i]);
+            }
+            total_length += h_length[i];
+        }
         // Write data to output file
         if (step % outputFrequency == 0)
         {
