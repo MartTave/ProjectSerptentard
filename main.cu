@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <mpi.h>
 #include <cuda.h>
+#include <chrono>
 
 // == User lib ==
 #include "diagnostics/diagnostics.cuh"
@@ -16,6 +17,7 @@
 
 // Namespace
 using namespace std;
+using namespace std::chrono;
 
 // Advection Solver
 int main(int argc, char *argv[])
@@ -40,6 +42,8 @@ int main(int argc, char *argv[])
     }
     nx = 100 * scale;
     ny = 100 * scale; // Number of cells in each direction
+
+    long sum = 0;
 
     double Lx, Ly, dx, dy, tFinal, dt, time;
 
@@ -178,18 +182,15 @@ int main(int argc, char *argv[])
         }
         MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-        // MPI_Scatter(h_phi, recvcount, MPI_DOUBLE, h_phi, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Scatter(h_curvature, recvcount, MPI_DOUBLE, h_curvature, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Scatter(h_u, recvcount, MPI_DOUBLE, h_u, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Scatter(h_v, recvcount, MPI_DOUBLE, h_v, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Bcast(&max, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Bcast(&total_length, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
         // Write data to output file
         if (world_rank == 0 && step % outputFrequency == 0)
         {
+            auto then = high_resolution_clock::now();
             cout << "Step: " << step << "\n\n";
             writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
+            auto now = high_resolution_clock::now();
+            sum += duration_cast<nanoseconds>(now - then).count();
         }
     }
 
@@ -204,6 +205,7 @@ int main(int argc, char *argv[])
         CHECK_ERROR(cudaFree((void **)d_curvature));
         CHECK_ERROR(cudaFree((void **)d_u));
         CHECK_ERROR(cudaFree((void **)d_v));
+        printf("File writing took : %ld ns\n", sum);
     }
     MPI_Finalize();
     return 0;
