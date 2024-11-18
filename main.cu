@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     double dy = Ly / (ny - 1); // Spatial step [m]
 
     // == Temporal ==
-    double tFinal = 2.0;           // Final time [s]
+    double tFinal = 4.0;           // Final time [s]
     double dt = 0.005 / scale;     // Temporal step [s]
     int nSteps = int(tFinal / dt); // Number of steps to perform
     double time = 0.0;             // Actual Simulation time [s]
