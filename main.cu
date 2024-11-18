@@ -148,9 +148,9 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
     }
 
-    MPI_Bcast(d_phi, sizeof(*void), MPI_BYTE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(d_curvature, sizeof(*void), MPI_BYTE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(d_lengths, sizeof(*void), MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&d_phi, sizeof(*void), MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&d_curvature, sizeof(*void), MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&d_lengths, sizeof(*void), MPI_BYTE, 0, MPI_COMM_WORLD);
 
     // Copy data from device to host
     printf("Copying from index %d to %d, total nbr of element is : %d, and size is : %d\n", arrStart[world_rank], arrEnd[world_rank], splittedLengthes[world_rank], splittedSizes[world_rank]);
