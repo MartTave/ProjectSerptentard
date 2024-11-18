@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 
     // Data Initialization
     // == Spatial ==
-    int scale = 1;
+    int scale = 10;
     if (argc > 1)
     {
         scale = stoi(argv[1]);
