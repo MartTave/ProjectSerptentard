@@ -3,8 +3,8 @@
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
-#include <mpi.h>
 #include <cuda.h>
+#include <mpi.h>
 #include <chrono>
 
 // == User lib ==
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
     }
 
-    size_t pointerSize = sizeof(*double);
+    size_t pointerSize = sizeof(void *);
 
     MPI_Bcast(&d_phi, pointerSize, MPI_BYTE, 0, MPI_COMM_WORLD);
     MPI_Bcast(&d_curvature, pointerSize, MPI_BYTE, 0, MPI_COMM_WORLD);
