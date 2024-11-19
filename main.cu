@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
     {
         scale = stoi(argv[1]);
     }
-    nx = 10 * scale;
-    ny = 10 * scale; // Number of cells in each direction
+    nx = 100 * scale;
+    ny = 100 * scale; // Number of cells in each direction
 
     long sum = 0;
 
@@ -182,9 +182,13 @@ int main(int argc, char *argv[])
     string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank]);
     string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank]);
     string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank]);
-
+    if (world_rank == 0) {
+	cout << "Writing initial data\n";
+    }
     writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank);
-
+    if (world_rank == 0) {
+	cout << "Done - Written : " << outputName << "\n";
+    }
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
