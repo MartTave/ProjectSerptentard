@@ -51,13 +51,13 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
         header += "Z_COORDINATES 1 float\n0\nPOINT_DATA " + to_string(nx * ny) + "\n";
         header += "SCALARS phi float 1\nLOOKUP_TABLE default\n";
         MPI_File_write(fh, header.c_str(), header.size(), MPI_CHAR, MPI_STATUS_IGNORE);
-   	header_offset = header.size() * sizeof(char);
+        header_offset = header.size() * sizeof(char);
     }
 
     // This will sync all cores too !
     MPI_Bcast(&header_offset, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
     if (world_rank == 0) {
-	cout << "initial bcast done\n";
+        cout << "initial bcast done\n";
     }
     MPI_Offset phi_offset;
     MPI_Offset curvature_offset;

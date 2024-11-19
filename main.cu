@@ -232,6 +232,7 @@ int main(int argc, char *argv[])
             h_phi_splitted = h_phi;
             h_curvature_splitted = h_curvature;
             h_lengths_splitted = h_lengths;
+            cout << "Done loop\n";
         }
         else
         {
@@ -252,6 +253,11 @@ int main(int argc, char *argv[])
         }
         MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+        if (world_rank == 0)
+        {
+            cout << "Done reduce\n";
+        }
 
         string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank]);
         string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank]);
