@@ -79,8 +79,7 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
     curvature_offset = curvature_offset - curvature_size + v_offset;
 
     // We then write our first part (for each core)
-    MPI_File_write_at(fh, phi_offset, phi_part.c_str(), phi_size, MPI_CHAR, MPI_STATUS_IGNORE);
-
+    MPI_File_write_at(fh, phi_offset, phi_part.c_str(), phi_size, MPI_CHAR, MPI_STATUS_IGNORE); 
     // So we need to sync all cores to be sure they are all done
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Offset uHeaderSize;
@@ -91,6 +90,7 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
         uHeaderSize = uHeader.size() * sizeof(char);
         MPI_File_write_at(fh, u_offset, uHeader.c_str(), uHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
     }
+    return;
     // This will sync all cores
     MPI_Bcast(&uHeaderSize, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
     // Offsetting all remaining offsets because we just wrote to file
