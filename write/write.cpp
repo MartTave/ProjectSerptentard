@@ -10,14 +10,14 @@
 
 using namespace std;
 
-string getString(double *data, long size)
+string getString(double *data, long size, int world_rank)
 {
-    string toWrite;
+    string toWrite = "***Start for " + to_string(world_rank) + " ***\n";
     for (int i = 0; i < size; i++)
     {
         toWrite += to_string(data[i]) + "\n";
     }
-    return toWrite;
+    return toWrite + "***End for " + to_string(world_rank) + " ***\n";
 }
 
 // Write data to VTK file
@@ -35,7 +35,6 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
     MPI_Offset header_offset;
     if (world_rank == 0)
     {
-	cout << "Starting write...\n";
         string header = "# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET RECTILINEAR_GRID\n";
         header += "DIMENSIONS " + to_string(nx) + " " + to_string(ny) + " 1\n";
         header += "X_COORDINATES " + to_string(nx) + " float\n";
@@ -56,9 +55,6 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
 
     // This will sync all cores too !
     MPI_Bcast(&header_offset, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
-    if (world_rank == 0) {
-        cout << "initial bcast done\n";
-    }
     MPI_Offset phi_offset;
     MPI_Offset curvature_offset;
     MPI_Offset u_offset;

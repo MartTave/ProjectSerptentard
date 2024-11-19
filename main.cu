@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
     {
         scale = stoi(argv[1]);
     }
-    nx = 100 * scale;
-    ny = 100 * scale; // Number of cells in each direction
+    nx = 10 * scale;
+    ny = 10 * scale; // Number of cells in each direction
 
     long sum = 0;
 
@@ -54,8 +54,7 @@ int main(int argc, char *argv[])
     int count = 0; // Number of VTK file already written
     string scaleStr = ss.str();
     // == Output ==
-    ss << scale;
-    string outputName = "output/levelSet_scale" + scaleStr + "_";
+    string outputName = "output/levelSet_scale" + to_string(scale) + "_";
 
     dim3 dimGrid, dimBlock;
 
@@ -178,10 +177,13 @@ int main(int argc, char *argv[])
         MPI_Recv(h_v_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
     }
 
-    string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank]);
-    string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank]);
-    string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank]);
-    string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank]);
+    string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank], world_rank);
+    if (world_rank == 2) {
+	    cout << "I'm gonna write this : \n" << toWriteU << "\n";
+    }
+    string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank], world_rank);
+    string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
+    string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
     if (world_rank == 0) {
 	cout << "Writing initial data\n";
     }
@@ -189,6 +191,7 @@ int main(int argc, char *argv[])
     if (world_rank == 0) {
 	cout << "Done - Written : " << outputName << "\n";
     }
+    return 0;
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
@@ -232,7 +235,6 @@ int main(int argc, char *argv[])
             h_phi_splitted = h_phi;
             h_curvature_splitted = h_curvature;
             h_lengths_splitted = h_lengths;
-            cout << "Done loop\n";
         }
         else
         {
@@ -243,7 +245,7 @@ int main(int argc, char *argv[])
 
         double localSum = 0;
         double localMax = 0;
-        for (int i = 0; i < arraySplittedSize; i++)
+        for (int i = 0; i < splittedLengthes[world_rank]; i++)
         {
             localSum += h_lengths_splitted[i];
             if (abs(h_curvature_splitted[i]) > localMax)
@@ -254,13 +256,8 @@ int main(int argc, char *argv[])
         MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-        if (world_rank == 0)
-        {
-            cout << "Done reduce\n";
-        }
-
-        string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank]);
-        string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank]);
+        string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
+        string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
 
         writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank);
 
