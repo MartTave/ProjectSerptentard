@@ -60,33 +60,40 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
     MPI_Offset u_offset;
     MPI_Offset v_offset;
 
+    // This is all the sizes for calculated for each core
     long phi_size = phi_part.size() * sizeof(char);
     long curvature_size = curvature_part.size() * sizeof(char);
     long u_size = u_part.size() * sizeof(char);
     long v_size = v_part.size() * sizeof(char);
 
+    // this will sum the offset for each core. So the last core will have all the previous offsets
     MPI_Scan(&phi_size, &phi_offset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
     MPI_Scan(&curvature_size, &curvature_offset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
     MPI_Scan(&u_size, &u_offset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
     MPI_Scan(&v_size, &v_offset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
 
+    // With those offsets, we now need to add the previous content to those
     phi_offset = phi_offset - phi_size + header_offset;
     u_offset = u_offset - u_size + phi_offset;
     v_offset = v_offset - v_size + u_offset;
     curvature_offset = curvature_offset - curvature_size + v_offset;
 
+    // We then write our first part (for each core)
     MPI_File_write_at(fh, phi_offset, phi_part.c_str(), phi_size, MPI_CHAR, MPI_STATUS_IGNORE);
 
+    // So we need to sync all cores to be sure they are all done
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Offset uHeaderSize;
     if (world_rank == 0)
     {
+        // Then we write the separation (needed by the file format)
         string uHeader = "\nSCALARS u float 1\nLOOKUP_TABLE default\n";
         uHeaderSize = uHeader.size() * sizeof(char);
         MPI_File_write_at(fh, u_offset, uHeader.c_str(), uHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
     }
+    // This will sync all cores
     MPI_Bcast(&uHeaderSize, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
-    // Offsetting all offsets because we just wrote to file
+    // Offsetting all remaining offsets because we just wrote to file
     u_offset = u_offset + uHeaderSize;
     v_offset += uHeaderSize;
     curvature_offset += uHeaderSize;

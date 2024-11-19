@@ -150,14 +150,33 @@ int main(int argc, char *argv[])
 
     size_t pointerSize = sizeof(void *);
 
-    MPI_Bcast(&d_phi, pointerSize, MPI_BYTE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&d_curvature, pointerSize, MPI_BYTE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&d_lengths, pointerSize, MPI_BYTE, 0, MPI_COMM_WORLD);
+    if (world_rank == 0)
+    {
+        CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_u, d_u, size, cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_v, d_v, size, cudaMemcpyDeviceToHost));
+        for (int i = 1; i < world_size; i++)
+        {
+            MPI_Send(h_phi + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+            MPI_Send(h_curvature + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+            MPI_Send(h_u + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+            MPI_Send(h_v + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+        }
 
-    // Copy data from device to host
-    printf("Copying from index %d to %d, total nbr of element is : %d, and size is : %d\n", arrStart[world_rank], arrEnd[world_rank], splittedLengthes[world_rank], splittedSizes[world_rank]);
-    CHECK_ERROR(cudaMemcpy(h_phi_splitted, d_phi + 1, 2 * sizeof(double), cudaMemcpyDeviceToHost));
-    CHECK_ERROR(cudaMemcpy(h_curvature_splitted, d_curvature + 1, splittedSizes[world_rank], cudaMemcpyDeviceToHost));
+        // We can set the starting pointer to the first element of the array, as the size will delimit what will be sent to the next function
+        h_phi_splitted = h_phi;
+        h_curvature_splitted = h_curvature;
+        h_u_splitted = h_u;
+        h_v_splitted = h_v;
+    }
+    else
+    {
+        MPI_Recv(h_phi_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(h_curvature_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(h_u_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(h_v_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+    }
 
     string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank]);
     string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank]);
@@ -194,12 +213,29 @@ int main(int argc, char *argv[])
             // Diagnostics: interface curvature
             computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, nx, ny, dx, dy);
 
-            // cudaDeviceSynchronize();
+            cudaDeviceSynchronize();
+            CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
+            CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
+            CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
+
+            for (int i = 1; i < world_size; i++)
+            {
+                MPI_Send(h_phi + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+                MPI_Send(h_curvature + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+                MPI_Send(h_lengths + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+            }
+            // TODO:Maybe no need to do this, as the pointer still point to the same place
+            h_phi_splitted = h_phi;
+            h_curvature_splitted = h_curvature;
+            h_lengths_splitted = h_lengths;
+        }
+        else
+        {
+            MPI_Recv(h_phi_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+            MPI_Recv(h_curvature_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+            MPI_Recv(h_lengths_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
         }
 
-        CHECK_ERROR(cudaMemcpy(h_phi_splitted, &d_phi[arrStart[world_rank]], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
-        CHECK_ERROR(cudaMemcpy(h_lengths_splitted, &d_lengths[arrStart[world_rank]], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
-        CHECK_ERROR(cudaMemcpy(h_curvature_splitted, &d_curvature[arrStart[world_rank]], splittedSizes[world_rank], cudaMemcpyDeviceToHost));
         double localSum = 0;
         double localMax = 0;
         for (int i = 0; i < arraySplittedSize; i++)
