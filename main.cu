@@ -178,19 +178,10 @@ int main(int argc, char *argv[])
     }
 
     string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank], world_rank);
-    if (world_rank == 2) {
-	    cout << "I'm gonna write this : \n" << toWriteU << "\n";
-    }
     string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank], world_rank);
     string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
     string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
-    if (world_rank == 0) {
-	cout << "Writing initial data\n";
-    }
     writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank, world_size);
-    if (world_rank == 0) {
-	cout << "Done - Written : " << outputName << "\n";
-    } 
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
@@ -255,14 +246,16 @@ int main(int argc, char *argv[])
         MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-        string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
-        string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
-
         // Write data to output file
-        if (world_rank == 0 && step % outputFrequency == 0)
+        if (step % outputFrequency == 0)
         {
+            string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
+            string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
             writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank, world_size);
-            cout << "Step: " << step << "\n\n";
+            if (world_rank == 0)
+            {
+                cout << "Step: " << step << "\n\n";
+            }
         }
     }
 
