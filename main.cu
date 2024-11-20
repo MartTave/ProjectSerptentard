@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
     {
         scale = stoi(argv[1]);
     }
-    nx = 10 * scale;
-    ny = 10 * scale; // Number of cells in each direction
+    nx = 100 * scale;
+    ny = 100 * scale; // Number of cells in each direction
 
     long sum = 0;
 
@@ -187,11 +187,10 @@ int main(int argc, char *argv[])
     if (world_rank == 0) {
 	cout << "Writing initial data\n";
     }
-    writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank);
+    writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank, world_size);
     if (world_rank == 0) {
 	cout << "Done - Written : " << outputName << "\n";
-    }
-    return 0;
+    } 
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
@@ -259,7 +258,7 @@ int main(int argc, char *argv[])
         string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
         string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
 
-        writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank);
+        writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank, world_size);
 
         // Write data to output file
         if (world_rank == 0 && step % outputFrequency == 0)

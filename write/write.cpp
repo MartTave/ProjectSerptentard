@@ -12,16 +12,16 @@ using namespace std;
 
 string getString(double *data, long size, int world_rank)
 {
-    string toWrite = "***Start for " + to_string(world_rank) + " ***\n";
+    string toWrite = "";
     for (int i = 0; i < size; i++)
     {
         toWrite += to_string(data[i]) + "\n";
     }
-    return toWrite + "***End for " + to_string(world_rank) + " ***\n";
+    return toWrite;
 }
 
 // Write data to VTK file
-void writeDataVTK(const string filename, string phi_part, string curvature_part, string u_part, string v_part, const int nx, const int ny, const double dx, const double dy, const int step, const int world_rank)
+void writeDataVTK(const string filename, string phi_part, string curvature_part, string u_part, string v_part, const int nx, const int ny, const double dx, const double dy, const int step, const int world_rank, const int world_size)
 {
 
     MPI_File fh;
@@ -74,9 +74,9 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
 
     // With those offsets, we now need to add the previous content to those
     phi_offset = phi_offset - phi_size + header_offset;
-    u_offset = u_offset - u_size + phi_offset;
-    v_offset = v_offset - v_size + u_offset;
-    curvature_offset = curvature_offset - curvature_size + v_offset;
+
+    MPI_Offset endOfPhi = phi_offset + phi_size;
+    MPI_Bcast(&endOfPhi, 1, MPI_OFFSET, world_size - 1, MPI_COMM_WORLD);
 
     // We then write our first part (for each core)
     MPI_File_write_at(fh, phi_offset, phi_part.c_str(), phi_size, MPI_CHAR, MPI_STATUS_IGNORE); 
@@ -88,33 +88,34 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
         // Then we write the separation (needed by the file format)
         string uHeader = "\nSCALARS u float 1\nLOOKUP_TABLE default\n";
         uHeaderSize = uHeader.size() * sizeof(char);
-        MPI_File_write_at(fh, u_offset, uHeader.c_str(), uHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
+        MPI_File_write_at(fh, endOfPhi, uHeader.c_str(), uHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
     }
-    return;
     // This will sync all cores
     MPI_Bcast(&uHeaderSize, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
     // Offsetting all remaining offsets because we just wrote to file
-    u_offset = u_offset + uHeaderSize;
-    v_offset += uHeaderSize;
-    curvature_offset += uHeaderSize;
+    u_offset = u_offset + uHeaderSize + endOfPhi - u_size;
     MPI_File_write_at(fh, u_offset, u_part.c_str(), u_size, MPI_CHAR, MPI_STATUS_IGNORE);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Offset uEnd = u_offset + u_size;
+
+    MPI_Bcast(&uEnd, 1, MPI_OFFSET, world_size - 1, MPI_COMM_WORLD);
+ 
     MPI_Offset vHeaderSize;
     if (world_rank == 0)
     {
         string vHeader = "\nSCALARS v float 1\nLOOKUP_TABLE default\n";
         vHeaderSize = vHeader.size() * sizeof(char);
-        MPI_File_write_at(fh, v_offset, vHeader.c_str(), vHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
+        MPI_File_write_at(fh, uEnd, vHeader.c_str(), vHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
     }
     MPI_Bcast(&vHeaderSize, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
 
-    v_offset = v_offset + vHeaderSize;
-    curvature_offset += vHeaderSize;
+    v_offset = v_offset + vHeaderSize + uEnd - v_size;
 
     MPI_File_write_at(fh, v_offset, v_part.c_str(), v_size, MPI_CHAR, MPI_STATUS_IGNORE);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Offset vEnd = v_offset + v_size;
+
+    MPI_Bcast(&vEnd, 1, MPI_OFFSET, world_size - 1, MPI_COMM_WORLD);
 
     MPI_Offset curvatureHeaderSize;
 
@@ -122,11 +123,11 @@ void writeDataVTK(const string filename, string phi_part, string curvature_part,
     {
         string curvatureHeader = "\nSCALARS curvature float 1\nLOOKUP_TABLE default\n";
         curvatureHeaderSize = curvatureHeader.size() * sizeof(char);
-        MPI_File_write_at(fh, curvature_offset, curvatureHeader.c_str(), curvatureHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
+        MPI_File_write_at(fh, vEnd, curvatureHeader.c_str(), curvatureHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
     }
     MPI_Bcast(&curvatureHeaderSize, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
 
-    curvature_offset = curvature_offset + curvatureHeaderSize;
+    curvature_offset = curvature_offset + curvatureHeaderSize + vEnd - curvature_size;
 
     MPI_File_write_at(fh, curvature_offset, curvature_part.c_str(), curvature_size, MPI_CHAR, MPI_STATUS_IGNORE);
 
