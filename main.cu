@@ -258,11 +258,10 @@ int main(int argc, char *argv[])
         string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
         string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
 
-        writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank, world_size);
-
         // Write data to output file
         if (world_rank == 0 && step % outputFrequency == 0)
         {
+            writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank, world_size);
             cout << "Step: " << step << "\n\n";
         }
     }
