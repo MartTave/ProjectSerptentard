@@ -10,15 +10,12 @@
 
 using namespace std;
 
-string getString(double *data, long nx, long ny, int world_rank)
+string getString(double *data, long size, int world_rank)
 {
     string toWrite = "";
-    for (int i = 0; i < nx; i++)
+    for (int i = 0; i < size; i++)
     {
-        for (int j = 0; j < ny; j++)
-        {
-            toWrite += to_string(data[i * ny + j]) + "\n";
-        }
+        toWrite += to_string(data[i]) + "\n";
     }
     return toWrite;
 }
