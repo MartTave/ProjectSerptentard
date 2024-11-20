@@ -108,7 +108,6 @@ int main(int argc, char *argv[])
                 splittedLengthes[i] = nbrOfElements;
             }
             splittedSizes[i] = splittedLengthes[i] * sizeof(double);
-            printf("Array start and end is : %d %d\n", arrStart[i], arrEnd[i]);
         }
     }
 
@@ -270,7 +269,6 @@ int main(int argc, char *argv[])
         CHECK_ERROR(cudaFree((void **)d_curvature));
         CHECK_ERROR(cudaFree((void **)d_u));
         CHECK_ERROR(cudaFree((void **)d_v));
-        printf("File writing took : %ld ns\n", sum);
     }
     MPI_Finalize();
     return 0;
