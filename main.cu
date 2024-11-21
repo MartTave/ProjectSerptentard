@@ -34,10 +34,7 @@ int main(int argc, char *argv[])
     // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-    if (world_rank == 0)
-    {
-        auto initStart = high_resolution_clock::now();
-    }
+    auto initStart = high_resolution_clock::now();
 
     // Variables declaration
     int nx, ny, nSteps, scale, outputFrequency, gridWidth, gridHeight, windowSize;
@@ -188,10 +185,7 @@ int main(int argc, char *argv[])
     string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
     writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank, world_size);
 
-    if (world_rank == 0)
-    {
-        auto initEnd = high_resolution_clock::now();
-    }
+    auto initEnd = high_resolution_clock::now();
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
@@ -268,10 +262,7 @@ int main(int argc, char *argv[])
             }
         }
     }
-    if (world_rank == 0)
-    {
-        auto loopEnd = high_resolution_clock::now();
-    }
+    auto loopEnd = high_resolution_clock::now();
     delete[] h_phi, h_curvature, h_u, h_v;
 
     if (world_rank == 0)
