@@ -73,7 +73,6 @@ int main(int argc, char *argv[])
     {
 
         time += dt; // Simulation time increases
-        cout << "\nStarting iteration step " << step << "/" << nSteps << "\tTime " << time << "s\n";
 
         // Solve the advection equation
         solveAdvectionEquationExplicit(phi, u, v, nx, ny, dx, dy, dt);
@@ -87,6 +86,7 @@ int main(int argc, char *argv[])
         // Write data to output file
         if (step % outputFrequency == 0)
         {
+            cout << "\nStarting iteration step " << step << "/" << nSteps << "\tTime " << time << "s\n";
             writeDataVTK(outputName, phi, curvature, u, v, nx, ny, dx, dy, count++);
         }
     }
