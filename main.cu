@@ -23,44 +23,32 @@ using namespace std::chrono;
 int main(int argc, char *argv[])
 {
 
+    // == MPI Initialization ==
     MPI_Status status;
-
     int world_size, world_rank;
 
     MPI_Init(&argc, &argv);
-
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-    // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
     auto initStart = high_resolution_clock::now();
 
     // Variables declaration
-    int nx, ny, nSteps, scale, outputFrequency, gridWidth, gridHeight, windowSize;
-    scale = 10;
+    int scale = 10;
     if (argc > 1)
     {
         scale = stoi(argv[1]);
     }
-    nx = 100 * scale;
-    ny = 100 * scale; // Number of cells in each direction
-
-    long sum = 0;
-
-    double Lx, Ly, dx, dy, tFinal, dt, time;
-
-    long arrayLength, arraySplittedSize;
-    arrayLength = nx * ny;
-    stringstream ss;
+    int nx = 100 * scale; // Number of cells in each direction
+    int ny = 100 * scale; // Number of cells in each direction
 
     int count = 0; // Number of VTK file already written
-    string scaleStr = ss.str();
+
     // == Output ==
     string outputName = "output/levelSet_scale" + to_string(scale) + "_";
 
-    dim3 dimGrid, dimBlock;
-
+    // == Host Variables ==
+    long arrayLength = nx * ny;
     double *h_phi = new double[arrayLength];
     double *h_curvature = new double[arrayLength + (arrayLength % world_size)];
     double *h_u = new double[arrayLength + (arrayLength % world_size)];
@@ -72,59 +60,71 @@ int main(int argc, char *argv[])
     int *splittedLengthes = new int[world_size];
     int *splittedSizes = new int[world_size];
 
-    Lx = 1.0;
-    Ly = 1.0; // Square domain [m]
-    dx = Lx / (nx - 1);
-    dy = Ly / (ny - 1); // Spatial step [m]
+    // == Spatial ==
+    double Lx = 1.0;           // Square domain [m]
+    double Ly = 1.0;           // Square domain [m]
+    double dx = Lx / (nx - 1); // Spatial step [m]
+    double dy = Ly / (ny - 1); // Spatial step [m]
 
     // == Temporal ==
-    tFinal = 4.0;              // Final time [s]
-    dt = 0.005 / scale;        // Temporal step [s]
-    nSteps = int(tFinal / dt); // Number of steps to perform
-    time = 0.0;                // Actual Simulation time [s]
+    double tFinal = 4.0;           // Final time [s]
+    double dt = 0.005 / scale;     // Temporal step [s]
+    int nSteps = int(tFinal / dt); // Number of steps to perform
+    double time = 0.0;             // Actual Simulation time [s]
 
     // == Numerical ==
-    outputFrequency = nSteps / 40;
+    int outputFrequency = nSteps / 40;
 
-    windowSize = 25;
-    gridWidth = (nx + windowSize - 1) / windowSize;
+    int windowSize = 25;
+    int gridWidth = (nx + windowSize - 1) / windowSize;
     gridHeight = (ny + windowSize - 1) / windowSize;
-    dimGrid = dim3(gridWidth, gridHeight);
-    dimBlock = dim3(windowSize, windowSize);
+    dim3 dimGrid = dim3(gridWidth, gridHeight);
+    dim3 dimBlock = dim3(windowSize, windowSize);
 
     if (world_rank == 0)
     {
+        // The rest to allocate to the first cores
+        // If rest == 4 -> the first 4 cores will have one element more in their array
         int rest = arrayLength % world_size;
+        // This is the base number of elements that each core will have
         int nbrOfElements = arrayLength / world_size;
         for (int i = 0; i < world_size; i++)
         {
             if (i < rest)
             {
+                // Here we are at the first cores
+                // They need 1 element more in they array to make the array split work
                 arrStart[i] = i * (nbrOfElements + 1);
                 arrEnd[i] = (i + 1) * (nbrOfElements + 1);
                 splittedLengthes[i] = (nbrOfElements + 1);
             }
             else
             {
+                // Here we are at the last cores
+                // They can take the right number of element
                 arrStart[i] = rest * (nbrOfElements + 1) + (i - rest) * nbrOfElements;
                 arrEnd[i] = rest * (nbrOfElements + 1) + (i - rest + 1) * nbrOfElements;
                 splittedLengthes[i] = nbrOfElements;
             }
+            // This is not really necessary, but as we will not have that many cores, it will not be a problem
             splittedSizes[i] = splittedLengthes[i] * sizeof(double);
         }
     }
 
+    // Casting sizes calculation to everyone
     MPI_Bcast(arrStart, world_size, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(arrEnd, world_size, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(splittedLengthes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(splittedSizes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
 
+    // Host copy of CUDA Device arrays
     double *h_phi_splitted = new double[splittedLengthes[world_rank]];
     double *h_curvature_splitted = new double[splittedLengthes[world_rank]];
     double *h_lengths_splitted = new double[splittedLengthes[world_rank]];
     double *h_u_splitted = new double[splittedLengthes[world_rank]];
     double *h_v_splitted = new double[splittedLengthes[world_rank]];
 
+    // CUDA Device pointer (arrrays)
     double *d_phi;
     double *d_phi_n;
     double *d_curvature;
@@ -134,31 +134,36 @@ int main(int argc, char *argv[])
 
     if (world_rank == 0)
     {
-        mkdir("output", 0777); // Create output folder
-        CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
+        // Allocating everything on the CUDA device and creating the result folder
+        mkdir("output", cudaMalloc 0777); // Create output folder
+        CHECK_ERROR(((void **)&d_phi, size));
         CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
         CHECK_ERROR(cudaMalloc((void **)&d_phi_n, size));
         CHECK_ERROR(cudaMalloc((void **)&d_curvature, size));
         CHECK_ERROR(cudaMalloc((void **)&d_u, size));
         CHECK_ERROR(cudaMalloc((void **)&d_v, size));
 
+        // Launching the initialization kernel
         InitializationKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
+        // Waiting for the kernel to finish
         cudaDeviceSynchronize();
+        // Launching the boundaires kernels
         computeBoundariesLines<<<1, nx>>>(d_phi, nx, ny);
         computeBoundariesColumns<<<1, ny>>>(d_phi, nx, ny);
+        // Waiting for the kernel to finish
         cudaDeviceSynchronize();
     }
 
-    size_t pointerSize = sizeof(void *);
-
     if (world_rank == 0)
     {
+        // Getting the results from the device
         CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
         CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
         CHECK_ERROR(cudaMemcpy(h_u, d_u, size, cudaMemcpyDeviceToHost));
         CHECK_ERROR(cudaMemcpy(h_v, d_v, size, cudaMemcpyDeviceToHost));
         for (int i = 1; i < world_size; i++)
         {
+            // Core 0 will send parts of the arrays to each core
             MPI_Send(h_phi + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
             MPI_Send(h_curvature + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
             MPI_Send(h_u + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
@@ -173,22 +178,26 @@ int main(int argc, char *argv[])
     }
     else
     {
+        // Every other core will receive the parts of the arrays from the core 0
         MPI_Recv(h_phi_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
         MPI_Recv(h_curvature_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
         MPI_Recv(h_u_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
         MPI_Recv(h_v_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
     }
 
+    // Then  every core can transform their array in string to write it in the VTK file
     string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank], world_rank);
     string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank], world_rank);
     string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
     string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
+    // Launching write funtion with each part of the data to write
     writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank, world_size);
 
     auto initEnd = high_resolution_clock::now();
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
+        // Resetting variables
         double max = 0;
         double total_length = 0;
 
@@ -201,11 +210,14 @@ int main(int argc, char *argv[])
             copyPhi<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, nx, ny);
             solveAdvectionEquationExplicit<<<dimGrid, dimBlock>>>(d_phi, d_phi_n, d_u, d_v, nx, ny, dx, dy, dt);
 
+            // Waiting for kernels to finish
             cudaDeviceSynchronize();
 
+            // Computing boundaries
             computeBoundariesLines<<<1, nx>>>(d_phi, nx, ny);
             computeBoundariesColumns<<<1, ny>>>(d_phi, nx, ny);
 
+            // Waiting
             cudaDeviceSynchronize();
 
             // Diagnostics: interface perimeter
@@ -215,28 +227,32 @@ int main(int argc, char *argv[])
             computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, nx, ny, dx, dy);
 
             cudaDeviceSynchronize();
+            // Copying results to CPU memory
             CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
             CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
             CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
 
             for (int i = 1; i < world_size; i++)
             {
+                // Sending results part to each core
                 MPI_Send(h_phi + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
                 MPI_Send(h_curvature + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
                 MPI_Send(h_lengths + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
             }
-            // TODO:Maybe no need to do this, as the pointer still point to the same place
+            // TODO: Maybe we don't need to do that, as the pointer should stay at the right place
             h_phi_splitted = h_phi;
             h_curvature_splitted = h_curvature;
             h_lengths_splitted = h_lengths;
         }
         else
         {
+            // Receiving the results from the core 0
             MPI_Recv(h_phi_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
             MPI_Recv(h_curvature_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
             MPI_Recv(h_lengths_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
         }
 
+        // Every core computes their local sum and max
         double localSum = 0;
         double localMax = 0;
         for (int i = 0; i < splittedLengthes[world_rank]; i++)
@@ -247,12 +263,14 @@ int main(int argc, char *argv[])
                 localMax = abs(h_curvature_splitted[i]);
             }
         }
+        // Reducing the results to core 0
         MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-        // Write data to output file
+        // Write data to output file i needed
         if (step % outputFrequency == 0)
         {
+            // Every core transforms their array in string to write it in the VTK file
             string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
             string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
             writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank, world_size);
