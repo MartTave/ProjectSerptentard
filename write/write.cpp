@@ -10,255 +10,127 @@
 
 using namespace std;
 
-// Write data to VTK file
-void writeDataVTK(const string filename, double *phi, double *curvature, double *u, double *v, const int nx, const int ny, const double dx, const double dy, const int step)
+string getString(double *data, long size, int world_rank)
 {
-
-    // Create the filename
-    string filename_all = "0000000" + to_string(step);
-    reverse(filename_all.begin(), filename_all.end());
-    filename_all.resize(7);
-    reverse(filename_all.begin(), filename_all.end());
-    filename_all = filename + filename_all + ".vtk";
-
-    // Inform user the output filename
-    cout << "Writing data into " << filename_all << "\n";
-
-    // Setting open file using output file streaming
-    ofstream myfile;
-    myfile.open(filename_all);
-
-    // Write header of vtk file
-    myfile << "# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET RECTILINEAR_GRID\n";
-
-    // Write domain dimensions (must be 3D)
-    myfile << "DIMENSIONS " << nx << " " << ny << " 1\n";
-    myfile << "X_COORDINATES " << nx << " float\n";
-    for (int i = 0; i < nx; i++)
+    string toWrite = "";
+    for (int i = 0; i < size; i++)
     {
-        myfile << i * dx << "\n";
+        toWrite += to_string(data[i]) + "\n";
     }
-
-    myfile << "Y_COORDINATES " << ny << " float\n";
-    for (int j = 0; j < ny; j++)
-    {
-        myfile << j * dy << "\n";
-    }
-
-    myfile << "Z_COORDINATES 1 float\n";
-    myfile << "0\n";
-
-    // Write number of cells
-    myfile << "POINT_DATA " << nx * ny << "\n";
-
-    // Write the phi values (loop over ny then nx)
-    myfile << "SCALARS phi float 1\n";
-    myfile << "LOOKUP_TABLE default\n";
-
-    for (int j = 0; j < ny; j++)
-    {
-        for (int i = 0; i < nx; i++)
-        {
-            myfile << phi[i * ny + j] << "\n";
-        }
-    }
-
-    // Write the x velocity values (loop over ny then nx)
-    myfile << "\nSCALARS u float 1\n";
-    myfile << "LOOKUP_TABLE default\n";
-
-    for (int j = 0; j < ny; j++)
-    {
-        for (int i = 0; i < nx; i++)
-        {
-            myfile << u[i * ny + j] << "\n";
-        }
-    }
-
-    // Write the y velocity values (loop over ny then nx)
-    myfile << "\nSCALARS v float 1\n";
-    myfile << "LOOKUP_TABLE default\n";
-
-    for (int j = 0; j < ny; j++)
-    {
-        for (int i = 0; i < nx; i++)
-        {
-            myfile << v[i * ny + j] << "\n";
-        }
-    }
-
-    // Write the curvature values (loop over ny then nx)
-    myfile << "\nSCALARS curvature float 1\n";
-    myfile << "LOOKUP_TABLE default\n";
-
-    for (int j = 0; j < ny; j++)
-    {
-        for (int i = 0; i < nx; i++)
-        {
-            myfile << curvature[i * ny + j] << "\n";
-        }
-    }
-
-    // Close file
-    myfile.close();
+    return toWrite;
 }
 
-
-void writeDataMPIVTK(const string filename, double *phi, double *curvature, double *u, double *v, const int nx, const int ny, const double dx, const double dy, const int step)
+// Write data to VTK file
+void writeDataVTK(const string filename, string phi_part, string curvature_part, string u_part, string v_part, const int nx, const int ny, const double dx, const double dy, const int step, const int world_rank, const int world_size)
 {
 
     MPI_File fh;
-    int rank;
-    int n_pro=72;
-    int elem_pr_proc=sizeof(curvature)/72;
-    
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    double *part[sizeof(double)*elem_pr_proc];
-    
-    // Create the filename
     string filename_all = "0000000" + to_string(step);
     reverse(filename_all.begin(), filename_all.end());
     filename_all.resize(7);
     reverse(filename_all.begin(), filename_all.end());
     filename_all = filename + filename_all + ".vtk";
-    if (rank == 0)
-        // Inform user the output filename
-        cout << "Writing data into " << filename_all << "\n";
+    MPI_File_open(MPI_COMM_WORLD, filename_all.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
 
-    // Setting open file using output file streaming
-    //ofstream myfile;
-    //myfile.open(filename_all);
-    char filenameCH[sizeof(filename_all) + 1];
-    strcpy(filenameCH, filename_all.c_str());
-    MPI_File_open(MPI_COMM_WORLD, filenameCH,
-        MPI_MODE_CREATE|MPI_MODE_WRONLY,
-        MPI_INFO_NULL, &fh);
-
-    if (rank == 0)
+    MPI_Offset header_offset;
+    if (world_rank == 0)
     {
-        char txt[]="# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET RECTILINEAR_GRID\n";
-        MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
-        string text="DIMENSIONS " + to_string(nx) + " " + to_string(ny) + " 1\n";
-        char txt[sizeof(text)+1];
-        strcpy(txt, text.c_str());
-        MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
-        string text="X_COORDINATES " + to_string(nx) + " float\n";
-        char txt[sizeof(text)+1];
-        strcpy(txt, text.c_str());
-        MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
-
-        string out;
+        string header = "# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET RECTILINEAR_GRID\n";
+        header += "DIMENSIONS " + to_string(nx) + " " + to_string(ny) + " 1\n";
+        header += "X_COORDINATES " + to_string(nx) + " float\n";
         for (int i = 0; i < nx; i++)
         {
-            out += to_string(i * dx) + "\n";
+            header += to_string(i * dx) + "\n";
         }
-        char arr[sizeof(out) + 1];
-
-        // copying the contents of the string to
-        // char array
-        strcpy(arr, out.c_str());
-        MPI_File_write_all(fh, arr, sizeof(arr), MPI_CHAR, MPI_STATUS_IGNORE);
-
-        string text="Y_COORDINATES " + to_string(nx) + " float\n";
-        char txt[sizeof(text)+1];
-        strcpy(txt, text.c_str());
-        MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
-        out="";
+        header += "Y_COORDINATES " + to_string(ny) + " float\n";
         for (int j = 0; j < ny; j++)
         {
-            out += to_string(j * dy) + "\n";
+            header += to_string(j * dy) + "\n";
         }
-        char arr[sizeof(out) + 1];
-
-        // copying the contents of the string to
-        // char array
-        strcpy(arr, out.c_str());
-        MPI_File_write_all(fh, arr, sizeof(arr), MPI_CHAR, MPI_STATUS_IGNORE);
-
-        string text = "Z_COORDINATES 1 float\n0\nPOINT_DATA " + to_string(nx * ny) + "\nSCALARS phi float 1\nLOOKUP_TABLE default\n";
-        char txt[sizeof(text)+1];
-        strcpy(txt, text.c_str());
-        MPI_File_write_all(fh, txt, sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    if(rank==0){
-        MPI_Scatter(curvature, elem_pr_proc, MPI_DOUBLE, part,
-            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Gather(&part, 1, MPI_DOUBLE, part, 1, MPI_DOUBLE, 0,
-           MPI_COMM_WORLD);
-
-    MPI_File_write_all(fh, part, sizeof(part), MPI_DOUBLE, MPI_STATUS_IGNORE);
-    MPI_Barrier(MPI_COMM_WORLD);
-    if(rank==0){
-        MPI_Scatter(phi, elem_pr_proc, MPI_DOUBLE, part,
-            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Gather(&part, 1, MPI_DOUBLE, part, 1, MPI_DOUBLE, 0,
-           MPI_COMM_WORLD);
-
-    MPI_File_write_all(fh, part, sizeof(part), MPI_DOUBLE, MPI_STATUS_IGNORE);
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    if(rank==0){
-        char txt[]="\nSCALARS u float 1\nLOOKUP_TABLE default\n";
-        MPI_File_write_all(fh, txt,sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
+        header += "Z_COORDINATES 1 float\n0\nPOINT_DATA " + to_string(nx * ny) + "\n";
+        header += "SCALARS phi float 1\nLOOKUP_TABLE default\n";
+        MPI_File_write(fh, header.c_str(), header.size(), MPI_CHAR, MPI_STATUS_IGNORE);
+        header_offset = header.size() * sizeof(char);
     }
 
+    // This will sync all cores too !
+    MPI_Bcast(&header_offset, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
+    MPI_Offset phi_offset;
+    MPI_Offset curvature_offset;
+    MPI_Offset u_offset;
+    MPI_Offset v_offset;
 
-    if(rank==0){
-        MPI_Scatter(u, elem_pr_proc, MPI_DOUBLE, part,
-            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    // This is all the sizes for calculated for each core
+    long phi_size = phi_part.size() * sizeof(char);
+    long curvature_size = curvature_part.size() * sizeof(char);
+    long u_size = u_part.size() * sizeof(char);
+    long v_size = v_part.size() * sizeof(char);
 
+    // this will sum the offset for each core. So the last core will have all the previous offsets
+    MPI_Scan(&phi_size, &phi_offset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Scan(&curvature_size, &curvature_offset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Scan(&u_size, &u_offset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Scan(&v_size, &v_offset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
+
+    // With those offsets, we now need to add the previous content to those
+    phi_offset = phi_offset - phi_size + header_offset;
+
+    MPI_Offset endOfPhi = phi_offset + phi_size;
+    MPI_Bcast(&endOfPhi, 1, MPI_OFFSET, world_size - 1, MPI_COMM_WORLD);
+
+    // We then write our first part (for each core)
+    MPI_File_write_at(fh, phi_offset, phi_part.c_str(), phi_size, MPI_CHAR, MPI_STATUS_IGNORE); 
+    // So we need to sync all cores to be sure they are all done
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Offset uHeaderSize;
+    if (world_rank == 0)
+    {
+        // Then we write the separation (needed by the file format)
+        string uHeader = "\nSCALARS u float 1\nLOOKUP_TABLE default\n";
+        uHeaderSize = uHeader.size() * sizeof(char);
+        MPI_File_write_at(fh, endOfPhi, uHeader.c_str(), uHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Gather(&part, 1, MPI_DOUBLE, part, 1, MPI_DOUBLE, 0,
-           MPI_COMM_WORLD);
+    // This will sync all cores
+    MPI_Bcast(&uHeaderSize, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
+    // Offsetting all remaining offsets because we just wrote to file
+    u_offset = u_offset + uHeaderSize + endOfPhi - u_size;
+    MPI_File_write_at(fh, u_offset, u_part.c_str(), u_size, MPI_CHAR, MPI_STATUS_IGNORE);
 
-    MPI_File_write_all(fh, part, sizeof(part), MPI_DOUBLE, MPI_STATUS_IGNORE);
-    MPI_Barrier(MPI_COMM_WORLD);
-    
-    if(rank==0){
-        char txt[]="\nSCALARS v float 1\nLOOKUP_TABLE default\n";
-        MPI_File_write_all(fh, txt,sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
+    MPI_Offset uEnd = u_offset + u_size;
+
+    MPI_Bcast(&uEnd, 1, MPI_OFFSET, world_size - 1, MPI_COMM_WORLD);
+ 
+    MPI_Offset vHeaderSize;
+    if (world_rank == 0)
+    {
+        string vHeader = "\nSCALARS v float 1\nLOOKUP_TABLE default\n";
+        vHeaderSize = vHeader.size() * sizeof(char);
+        MPI_File_write_at(fh, uEnd, vHeader.c_str(), vHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
     }
+    MPI_Bcast(&vHeaderSize, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
 
-    if(rank==0){
-        MPI_Scatter(v, elem_pr_proc, MPI_DOUBLE, part,
-            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    v_offset = v_offset + vHeaderSize + uEnd - v_size;
 
+    MPI_File_write_at(fh, v_offset, v_part.c_str(), v_size, MPI_CHAR, MPI_STATUS_IGNORE);
+
+    MPI_Offset vEnd = v_offset + v_size;
+
+    MPI_Bcast(&vEnd, 1, MPI_OFFSET, world_size - 1, MPI_COMM_WORLD);
+
+    MPI_Offset curvatureHeaderSize;
+
+    if (world_rank == 0)
+    {
+        string curvatureHeader = "\nSCALARS curvature float 1\nLOOKUP_TABLE default\n";
+        curvatureHeaderSize = curvatureHeader.size() * sizeof(char);
+        MPI_File_write_at(fh, vEnd, curvatureHeader.c_str(), curvatureHeaderSize, MPI_CHAR, MPI_STATUS_IGNORE);
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Gather(&part, 1, MPI_DOUBLE, part, 1, MPI_DOUBLE, 0,
-           MPI_COMM_WORLD);
+    MPI_Bcast(&curvatureHeaderSize, 1, MPI_OFFSET, 0, MPI_COMM_WORLD);
 
-    MPI_File_write_all(fh, part, sizeof(part), MPI_DOUBLE, MPI_STATUS_IGNORE);
-    MPI_Barrier(MPI_COMM_WORLD);
+    curvature_offset = curvature_offset + curvatureHeaderSize + vEnd - curvature_size;
 
-    if(rank==0){
-        char txt[]="\nSCALARS curvature float 1\nLOOKUP_TABLE default\n";
-        MPI_File_write_all(fh, txt,sizeof(txt), MPI_CHAR, MPI_STATUS_IGNORE);
-    }
+    MPI_File_write_at(fh, curvature_offset, curvature_part.c_str(), curvature_size, MPI_CHAR, MPI_STATUS_IGNORE);
 
-    if(rank==0){
-        MPI_Scatter(curvature, elem_pr_proc, MPI_DOUBLE, part,
-            elem_pr_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Gather(&part, 1, MPI_DOUBLE, part, 1, MPI_DOUBLE, 0,
-           MPI_COMM_WORLD);
-
-    MPI_File_write_all(fh, part, sizeof(part), MPI_DOUBLE, MPI_STATUS_IGNORE);
-    MPI_Barrier(MPI_COMM_WORLD);
-    
-
-    // Close file
-    //myfile.close();
     MPI_File_close(&fh);
+    MPI_Barrier(MPI_COMM_WORLD);
 }

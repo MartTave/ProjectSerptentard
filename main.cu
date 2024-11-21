@@ -3,8 +3,9 @@
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
-#include <mpi.h>
 #include <cuda.h>
+#include <mpi.h>
+#include <chrono>
 
 // == User lib ==
 #include "diagnostics/diagnostics.cuh"
@@ -16,6 +17,7 @@
 
 // Namespace
 using namespace std;
+using namespace std::chrono;
 
 // Advection Solver
 int main(int argc, char *argv[])
@@ -41,6 +43,8 @@ int main(int argc, char *argv[])
     nx = 100 * scale;
     ny = 100 * scale; // Number of cells in each direction
 
+    long sum = 0;
+
     double Lx, Ly, dx, dy, tFinal, dt, time;
 
     long arrayLength, arraySplittedSize;
@@ -49,7 +53,8 @@ int main(int argc, char *argv[])
 
     int count = 0; // Number of VTK file already written
     string scaleStr = ss.str();
-    string outputName = "output/levelSet_scale" + scaleStr + "_";
+    // == Output ==
+    string outputName = "output/levelSet_scale" + to_string(scale) + "_";
 
     dim3 dimGrid, dimBlock;
 
@@ -58,42 +63,75 @@ int main(int argc, char *argv[])
     double *h_u = new double[arrayLength + (arrayLength % world_size)];
     double *h_v = new double[arrayLength + (arrayLength % world_size)];
     double *h_lengths = new double[arrayLength + (arrayLength % world_size)];
+    long size = arrayLength * sizeof(double);
+    int *arrStart = new int[world_size];
+    int *arrEnd = new int[world_size];
+    int *splittedLengthes = new int[world_size];
+    int *splittedSizes = new int[world_size];
+
+    Lx = 1.0;
+    Ly = 1.0; // Square domain [m]
+    dx = Lx / (nx - 1);
+    dy = Ly / (ny - 1); // Spatial step [m]
+
+    // == Temporal ==
+    tFinal = 4.0;              // Final time [s]
+    dt = 0.005 / scale;        // Temporal step [s]
+    nSteps = int(tFinal / dt); // Number of steps to perform
+    time = 0.0;                // Actual Simulation time [s]
+
+    // == Numerical ==
+    outputFrequency = nSteps / 40;
+
+    windowSize = 25;
+    gridWidth = (nx + windowSize - 1) / windowSize;
+    gridHeight = (ny + windowSize - 1) / windowSize;
+    dimGrid = dim3(gridWidth, gridHeight);
+    dimBlock = dim3(windowSize, windowSize);
+
+    if (world_rank == 0)
+    {
+        int rest = arrayLength % world_size;
+        int nbrOfElements = arrayLength / world_size;
+        for (int i = 0; i < world_size; i++)
+        {
+            if (i < rest)
+            {
+                arrStart[i] = i * (nbrOfElements + 1);
+                arrEnd[i] = (i + 1) * (nbrOfElements + 1);
+                splittedLengthes[i] = (nbrOfElements + 1);
+            }
+            else
+            {
+                arrStart[i] = rest * (nbrOfElements + 1) + (i - rest) * nbrOfElements;
+                arrEnd[i] = rest * (nbrOfElements + 1) + (i - rest + 1) * nbrOfElements;
+                splittedLengthes[i] = nbrOfElements;
+            }
+            splittedSizes[i] = splittedLengthes[i] * sizeof(double);
+        }
+    }
+
+    MPI_Bcast(arrStart, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(arrEnd, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(splittedLengthes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(splittedSizes, world_size, MPI_INT, 0, MPI_COMM_WORLD);
+
+    double *h_phi_splitted = new double[splittedLengthes[world_rank]];
+    double *h_curvature_splitted = new double[splittedLengthes[world_rank]];
+    double *h_lengths_splitted = new double[splittedLengthes[world_rank]];
+    double *h_u_splitted = new double[splittedLengthes[world_rank]];
+    double *h_v_splitted = new double[splittedLengthes[world_rank]];
+
     double *d_phi;
     double *d_phi_n;
     double *d_curvature;
     double *d_lengths;
     double *d_u;
     double *d_v;
-    long size = arrayLength * sizeof(double);
 
     if (world_rank == 0)
     {
-
-        Lx = 1.0;
-        Ly = 1.0; // Square domain [m]
-        dx = Lx / (nx - 1);
-        dy = Ly / (ny - 1); // Spatial step [m]
-
-        // == Temporal ==
-        tFinal = 4.0;              // Final time [s]
-        dt = 0.005 / scale;        // Temporal step [s]
-        nSteps = int(tFinal / dt); // Number of steps to perform
-        time = 0.0;                // Actual Simulation time [s]
-
-        // == Numerical ==
-        outputFrequency = nSteps / 40;
-
-        arraySplittedSize = (arrayLength + (arrayLength % world_size)) / world_size;
-
-        for (int i = arrayLength; i < arrayLength + (arrayLength % world_size); i++)
-        {
-            h_curvature[i] = 0;
-            h_u[i] = 0;
-            h_v[i] = 0;
-            h_lengths[i] = 0;
-        }
-        size = arrayLength * sizeof(double);
-
+        mkdir("output", 0777); // Create output folder
         CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
         CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
         CHECK_ERROR(cudaMalloc((void **)&d_phi_n, size));
@@ -101,37 +139,48 @@ int main(int argc, char *argv[])
         CHECK_ERROR(cudaMalloc((void **)&d_u, size));
         CHECK_ERROR(cudaMalloc((void **)&d_v, size));
 
-        windowSize = 25;
-        gridWidth = (nx + windowSize - 1) / windowSize;
-        gridHeight = (ny + windowSize - 1) / windowSize;
-        dimGrid = dim3(gridWidth, gridHeight);
-        dimBlock = dim3(windowSize, windowSize);
-
         InitializationKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, d_u, d_v, nx, ny, dx, dy);
         cudaDeviceSynchronize();
-        // TODO: computeInterfaceSignature ?
         computeBoundariesLines<<<1, nx>>>(d_phi, nx, ny);
         computeBoundariesColumns<<<1, ny>>>(d_phi, nx, ny);
         cudaDeviceSynchronize();
-        CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
-        // == Output ==
-        ss << scale;
-
-        // == First output ==
-        // Write data in VTK format
-        mkdir("output", 0777); // Create output folder
-
-        // TODO: Memcopy from device to host
-        writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
     }
 
-    MPI_Bcast(&arraySplittedSize, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+    size_t pointerSize = sizeof(void *);
 
-    printf("Ahahah the alloc is : %ld\n", arraySplittedSize);
+    if (world_rank == 0)
+    {
+        CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_u, d_u, size, cudaMemcpyDeviceToHost));
+        CHECK_ERROR(cudaMemcpy(h_v, d_v, size, cudaMemcpyDeviceToHost));
+        for (int i = 1; i < world_size; i++)
+        {
+            MPI_Send(h_phi + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+            MPI_Send(h_curvature + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+            MPI_Send(h_u + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+            MPI_Send(h_v + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+        }
 
-    double *h_curvature_splitted = new double[arraySplittedSize];
-    double *h_lengths_splitted = new double[arraySplittedSize];
+        // We can set the starting pointer to the first element of the array, as the size will delimit what will be sent to the next function
+        h_phi_splitted = h_phi;
+        h_curvature_splitted = h_curvature;
+        h_u_splitted = h_u;
+        h_v_splitted = h_v;
+    }
+    else
+    {
+        MPI_Recv(h_phi_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(h_curvature_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(h_u_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(h_v_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+    }
 
+    string toWriteU = getString(h_u_splitted, splittedLengthes[world_rank], world_rank);
+    string toWriteV = getString(h_v_splitted, splittedLengthes[world_rank], world_rank);
+    string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
+    string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
+    writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank, world_size);
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
@@ -160,34 +209,60 @@ int main(int argc, char *argv[])
             // Diagnostics: interface curvature
             computeInterfaceCurvatureKernel<<<dimGrid, dimBlock>>>(d_phi, d_curvature, nx, ny, dx, dy);
 
-            // cudaDeviceSynchronize();
-
+            cudaDeviceSynchronize();
             CHECK_ERROR(cudaMemcpy(h_phi, d_phi, size, cudaMemcpyDeviceToHost));
-            CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
             CHECK_ERROR(cudaMemcpy(h_curvature, d_curvature, size, cudaMemcpyDeviceToHost));
+            CHECK_ERROR(cudaMemcpy(h_lengths, d_lengths, size, cudaMemcpyDeviceToHost));
+
+            for (int i = 1; i < world_size; i++)
+            {
+                MPI_Send(h_phi + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+                MPI_Send(h_curvature + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+                MPI_Send(h_lengths + arrStart[i], splittedLengthes[i], MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+            }
+            // TODO:Maybe no need to do this, as the pointer still point to the same place
+            h_phi_splitted = h_phi;
+            h_curvature_splitted = h_curvature;
+            h_lengths_splitted = h_lengths;
         }
-        MPI_Scatter(h_curvature, arraySplittedSize, MPI_DOUBLE, h_curvature_splitted, arraySplittedSize, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Reduce(h_curvature, &max, arraySplittedSize, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-        MPI_Reduce(h_lengths, &total_length, arraySplittedSize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-        // MPI_Scatter(h_phi, recvcount, MPI_DOUBLE, h_phi, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Scatter(h_curvature, recvcount, MPI_DOUBLE, h_curvature, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Scatter(h_u, recvcount, MPI_DOUBLE, h_u, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Scatter(h_v, recvcount, MPI_DOUBLE, h_v, recvcount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Bcast(&max, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Bcast(&total_length, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        else
+        {
+            MPI_Recv(h_phi_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+            MPI_Recv(h_curvature_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+            MPI_Recv(h_lengths_splitted, splittedLengthes[world_rank], MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
+        }
+
+        double localSum = 0;
+        double localMax = 0;
+        for (int i = 0; i < splittedLengthes[world_rank]; i++)
+        {
+            localSum += h_lengths_splitted[i];
+            if (abs(h_curvature_splitted[i]) > localMax)
+            {
+                localMax = abs(h_curvature_splitted[i]);
+            }
+        }
+        MPI_Reduce(&localMax, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&localSum, &total_length, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
         // Write data to output file
-        if (world_rank == 0 && step % outputFrequency == 0)
+        if (step % outputFrequency == 0)
         {
-            cout << "Step: " << step << "\n\n";
-            writeDataVTK(outputName, h_phi, h_curvature, h_u, h_v, nx, ny, dx, dy, count++);
+            string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
+            string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
+            writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteU, nx, ny, dx, dy, count++, world_rank, world_size);
+            if (world_rank == 0)
+            {
+                cout << "Step: " << step << "\n\n";
+            }
         }
     }
+
+    delete[] h_phi, h_curvature, h_u, h_v;
 
     if (world_rank == 0)
     {
         // Free memory
-        delete[] h_phi, h_curvature, h_u, h_v;
 
         CHECK_ERROR(cudaFree((void **)d_phi));
         CHECK_ERROR(cudaFree((void **)d_phi_n));

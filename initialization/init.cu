@@ -13,10 +13,10 @@ __global__ void InitializationKernel(double *phi, double *curvature, double *u, 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (i >= nx || j >= ny) {
-        printf("Killing index out of array bounds, with indexes : %d, %d\n", i, j);
-        return;
-    }
+    // if (i >= nx || j >= ny) {
+    //     printf("Killing index out of array bounds, with indexes : %d, %d\n", i, j);
+    //     return;
+    // }
 
     // == Circle parameters ==
     double xcenter = 0.5;  // Circle position x
