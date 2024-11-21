@@ -22,6 +22,7 @@ using namespace std::chrono;
 // Advection Solver
 int main(int argc, char *argv[])
 {
+
     MPI_Status status;
 
     int world_size, world_rank;
@@ -32,6 +33,11 @@ int main(int argc, char *argv[])
 
     // Get the rank of the process
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    if (world_rank == 0)
+    {
+        auto initStart = high_resolution_clock::now();
+    }
 
     // Variables declaration
     int nx, ny, nSteps, scale, outputFrequency, gridWidth, gridHeight, windowSize;
@@ -181,6 +187,11 @@ int main(int argc, char *argv[])
     string toWritePhi = getString(h_phi_splitted, splittedLengthes[world_rank], world_rank);
     string toWriteCurvature = getString(h_curvature_splitted, splittedLengthes[world_rank], world_rank);
     writeDataVTK(outputName, toWritePhi, toWriteCurvature, toWriteU, toWriteV, nx, ny, dx, dy, count++, world_rank, world_size);
+
+    if (world_rank == 0)
+    {
+        auto initEnd = high_resolution_clock::now();
+    }
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
@@ -257,7 +268,10 @@ int main(int argc, char *argv[])
             }
         }
     }
-
+    if (world_rank == 0)
+    {
+        auto loopEnd = high_resolution_clock::now();
+    }
     delete[] h_phi, h_curvature, h_u, h_v;
 
     if (world_rank == 0)
@@ -269,6 +283,22 @@ int main(int argc, char *argv[])
         CHECK_ERROR(cudaFree((void **)d_curvature));
         CHECK_ERROR(cudaFree((void **)d_u));
         CHECK_ERROR(cudaFree((void **)d_v));
+    }
+
+    if (world_rank == 0)
+    {
+        auto end = high_resolution_clock::now();
+        int initDuration = chrono::duration_cast<chrono::milliseconds>(initEnd - initStart).count();
+        int loopDuration = chrono::duration_cast<chrono::milliseconds>(loopEnd - initEnd).count();
+        int totalDuration = chrono::duration_cast<chrono::milliseconds>(end - initStart).count();
+        int deallocateDuration = chrono::duration_cast<chrono::milliseconds>(end - loopEnd).count();
+
+        cout << "Sooooo, actually :\n";
+        cout << "Initialization took " << initDuration << "ms\n";
+        cout << "Loop took " << loopDuration << "ms\n";
+        cout << "Deallocate took " << deallocateDuration << "ms\n";
+        cout << "Total took " << totalDuration << "ms\n";
+        cout << "For scale " << scale << "\n";
     }
     MPI_Finalize();
     return 0;
