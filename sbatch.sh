@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=blblblblbl # Job name
+#SBATCH --job-name=iam_the_parralel_one # Job name
 #SBATCH --output=output.txt # Standard output file
 #SBATCH --error=error.txt # Standard error file
-#SBATCH --tasks=10 # Number of tasks per node
+#SBATCH --tasks=36 # Number of tasks per node
 #SBATCH --nodes=1 # Number of nodes
-#SBATCH --time=0-00:30 # Maximum runtime (D-HH:MM)
-#SBATCH --nodelist=calypso[3] # Specific nodes [Optional]
+#SBATCH --time=0-01:00 # Maximum runtime (D-HH:MM)
+#SBATCH --nodelist=calypso[2] # Specific nodes [Optional]
 #SBATCH --gpus-per-node=1 # Require GPUs
 #SBATCH -N 1
 #srun="srun -n1 -N1 --exclusive"
@@ -19,9 +19,11 @@
 # --resume          parallel can use a joblog and this to continue an interrupted run (job resubmitted)
 
 #$parallel "$srun ./run_serpentin arg1:{1}" ::: {1..10}
-
-for i in {1..10}
+for j in {1..10}
 do
-    ./run_serpentin $i
+for i in {1..8}
+do
+    mpirun -n 36 ./run_serpentin $i
+done
 done
 
