@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 
     int windowSize = 25;
     int gridWidth = (nx + windowSize - 1) / windowSize;
-    gridHeight = (ny + windowSize - 1) / windowSize;
+    int gridHeight = (ny + windowSize - 1) / windowSize;
     dim3 dimGrid = dim3(gridWidth, gridHeight);
     dim3 dimBlock = dim3(windowSize, windowSize);
 
@@ -135,8 +135,8 @@ int main(int argc, char *argv[])
     if (world_rank == 0)
     {
         // Allocating everything on the CUDA device and creating the result folder
-        mkdir("output", cudaMalloc 0777); // Create output folder
-        CHECK_ERROR(((void **)&d_phi, size));
+        mkdir("output", 0777); // Create output folder
+        CHECK_ERROR(cudaMalloc((void **)&d_phi, size));
         CHECK_ERROR(cudaMalloc((void **)&d_lengths, size));
         CHECK_ERROR(cudaMalloc((void **)&d_phi_n, size));
         CHECK_ERROR(cudaMalloc((void **)&d_curvature, size));
