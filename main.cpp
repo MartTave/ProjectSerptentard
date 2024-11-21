@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
+#include <chrono>
 
 // == User lib ==
 #include "diagnostics/diagnostics.h"
@@ -16,6 +17,8 @@ using namespace std;
 // Advection Solver
 int main(int argc, char *argv[])
 {
+
+    auto startInit = chrono::high_resolution_clock::now();
 
     // Data Initialization
     // == Spatial ==
@@ -68,6 +71,8 @@ int main(int argc, char *argv[])
     mkdir("output", 0777); // Create output folder
     writeDataVTK(outputName, phi, curvature, u, v, nx, ny, dx, dy, count++);
 
+    auto endInit = chrono::high_resolution_clock::now();
+
     // Loop over time
     for (int step = 1; step <= nSteps; step++)
     {
@@ -91,12 +96,28 @@ int main(int argc, char *argv[])
         }
     }
 
+    auto endLoop = chrono::high_resolution_clock::now();
+
     // Deallocate memory
     for (int i = 0; i < nx; ++i)
     {
         delete[] phi[i];
     }
     delete[] phi;
+
+    auto endDeallocate = chrono::high_resolution_clock::now();
+
+    int initDuration = chrono::duration_cast<chrono::milliseconds>(endInit - startInit).count();
+    int loopDuration = chrono::duration_cast<chrono::milliseconds>(endLoop - endInit).count();
+    int deallocateDuration = chrono::duration_cast<chrono::milliseconds>(endDeallocate - endLoop).count();
+    int totalDuration = chrono::duration_cast<chrono::milliseconds>(endDeallocate - startInit).count();
+
+    cout << "Sooooo, actually :\n";
+    cout << "Initialization took " << initDuration << "ms\n";
+    cout << "Loop took " << loopDuration << "ms\n";
+    cout << "Deallocate took " << deallocateDuration << "ms\n";
+    cout << "Total took " << totalDuration << "ms\n";
+    cout << "For scale " << scale << "\n";
 
     return 0;
 }
