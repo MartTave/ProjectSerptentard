@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=blblblblbl # Job name
+#SBATCH --job-name=my_first_job # Job name
 #SBATCH --output=output.txt # Standard output file
 #SBATCH --error=error.txt # Standard error file
 #SBATCH --tasks=10 # Number of tasks per node
@@ -19,9 +19,11 @@
 # --resume          parallel can use a joblog and this to continue an interrupted run (job resubmitted)
 
 #$parallel "$srun ./run_serpentin arg1:{1}" ::: {1..10}
-
-for i in {1..10}
+for j in {1..10}
 do
-    ./run_serpentin $i
+	for i in {1..5}
+	do
+	    ./run_serpentin $i
+	done
 done
 
